@@ -43,6 +43,8 @@ cat > "${APP}/Contents/Info.plist" <<PLIST
 	<key>CFBundleDevelopmentRegion</key><string>pt-BR</string>
 	<key>CFBundleLocalizations</key><array><string>pt-BR</string><string>en</string></array>
 	<key>LSUIElement</key><true/>
+	<key>NSSupportsAutomaticTermination</key><false/>
+	<key>NSSupportsSuddenTermination</key><false/>
 	<key>LSMinimumSystemVersion</key><string>14.0</string>
 	<key>NSHumanReadableCopyright</key><string>Daniel Manske</string>
 	<key>NSPrincipalClass</key><string>NSApplication</string>

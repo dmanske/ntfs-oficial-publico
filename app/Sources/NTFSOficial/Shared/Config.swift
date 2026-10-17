@@ -2,7 +2,9 @@ import Foundation
 
 /// Valores ajustáveis do app, num lugar só.
 enum Config {
-    static let versao = "0.1.0"
+    static let versao = "0.1.1"
+    /// Motivo registrado no macOS ao desligar o encerramento automático (app de barra de menus).
+    static let motivoSemEncerramento = "NTFS Oficial fica na barra de menus"
     static let identificador = "com.danielmanske.ntfsoficial.app"
     /// Nome de marca: não se traduz.
     static let nomeApp = "NTFS Oficial"

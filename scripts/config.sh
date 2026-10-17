@@ -7,7 +7,7 @@ NOME="ntfsoficial"
 NOME_EXIBICAO="NTFSOficial"
 # Prefixo dos identificadores (kext: ${IDENTIFICADOR}.filesystems.${NOME})
 IDENTIFICADOR="com.danielmanske.ntfsoficial"
-VERSAO="0.1.0"
+VERSAO="0.1.1"
 
 # Onde o pacote fica instalado
 PACOTE_FS="/Library/Filesystems/${NOME}.fs"
