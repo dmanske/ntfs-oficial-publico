@@ -1,0 +1,28 @@
+--- a/kext/osxfuse/fuse_sysctl.c	2026-10-17 13:34:13
++++ b/kext/osxfuse/fuse_sysctl.c	2026-10-17 13:34:13
+@@ -50,7 +50,12 @@
+ int32_t  fuse_memory_allocated       = 0;                                  // r
+ int32_t  fuse_realloc_count          = 0;                                  // r
+ int32_t  fuse_tickets_current        = 0;                                  // r
+-uint32_t fuse_userkernel_bufsize     = FUSE_DEFAULT_USERKERNEL_BUFSIZE;    // rw
++/*
++ * ntfsoficial: no arm64 o PAGE_SIZE do kernel não é constante de compilação
++ * (depende de PAGE_SHIFT_CONST), então o valor padrão é definido em
++ * fuse_sysctl_start(). O Tuxera grava um valor fixo de 16 MiB (visto com o REA).
++ */
++uint32_t fuse_userkernel_bufsize     = 0;                                  // rw
+ int32_t  fuse_vnodes_current         = 0;                                  // r
+ 
+ 
+@@ -616,6 +621,11 @@
+ fuse_sysctl_start(void)
+ {
+     int i;
++
++    if (fuse_userkernel_bufsize == 0) {
++        fuse_userkernel_bufsize = FUSE_DEFAULT_USERKERNEL_BUFSIZE;
++    }
++
+ #if OSXFUSE_ENABLE_MACFUSE_MODE
+     osxfuse_lock_group  = lck_grp_alloc_init("osxfuse", NULL);
+     osxfuse_sysctl_lock = lck_mtx_alloc_init(osxfuse_lock_group, NULL);

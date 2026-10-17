@@ -1,0 +1,17 @@
+--- a/common/fuse_param.h	2026-10-17 13:41:11
++++ b/common/fuse_param.h	2026-10-17 13:41:11
+@@ -145,7 +145,13 @@
+  *
+  * Nevertheless, the I/O size must be at least as big as the block size.
+  */
+-#define FUSE_DEFAULT_IOSIZE                     (16 * PAGE_SIZE)
++/*
++ * ntfsoficial: no arm64 o PAGE_SIZE não é constante de compilação (fora e dentro
++ * do kernel), e o mount_osxfuse usa este valor numa tabela estática. Valor fixo
++ * igual ao do mount_tuxera_ntfs (0x20000 = 128 KiB, visto com o REA), múltiplo
++ * da página de 4 KB e de 16 KB.
++ */
++#define FUSE_DEFAULT_IOSIZE                     (128 * 1024)
+ 
+ #define FUSE_MIN_IOSIZE                         PAGE_SIZE
+ #define FUSE_MAX_IOSIZE                         (FUSE_MAX_UPL_SIZE * PAGE_SIZE)

@@ -1,0 +1,16 @@
+--- a/ntfs-3g/src/lowntfs-3g.c	2026-10-17 16:33:00
++++ b/ntfs-3g/src/lowntfs-3g.c	2026-10-17 16:33:00
+@@ -4717,7 +4717,12 @@
+ 		ctx->blkdev = TRUE;
+ #endif
+ 
+-#ifndef FUSE_INTERNAL
++/*
++ * ntfsoficial: no macOS o DiskArbitration entrega o dispositivo do disco plugado ao usuário, e a
++ * montagem pelo Finder roda como esse usuário. Esta recusa é do fuseblk do Linux; o driver do Tuxera
++ * também não a tem (REA: sem a mensagem "Unprivileged user can not mount NTFS block devices").
++ */
++#if !defined(FUSE_INTERNAL) && !defined(__APPLE__)
+ 	if (getuid() && ctx->blkdev) {
+ 		ntfs_log_error("%s", unpriv_fuseblk_msg);
+ 		err = NTFS_VOLUME_NO_PRIVILEGE;

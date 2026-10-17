@@ -1,0 +1,44 @@
+--- a/ntfs-3g/src/lowntfs-3g.c	2026-10-17 17:34:47
++++ b/ntfs-3g/src/lowntfs-3g.c	2026-10-17 17:34:47
+@@ -1001,6 +1001,14 @@
+ 	else
+ 		fuse_reply_err(req, -res);
+ }
++
++/*
++ * ntfsoficial: geração = número de sequência do registro MFT, que o NTFS aumenta a cada reaproveitamento.
++ * Com geração sempre 1, apagar um arquivo e criar outro que reaproveita o mesmo registro fazia o kext entregar
++ * o vnode antigo (tamanho e cache do arquivo apagado): 17 de 245 arquivos errados no teste de estresse
++ * (17/10/2026). O kext confere a geração (fuse_node.c, "vnode changed generation"), como o do Tuxera (REA).
++ */
++#define GERACAO_NTFS(ni)	((u64)le16_to_cpu((ni)->mrec->sequence_number) + 1)
+ 
+ static __inline__ BOOL ntfs_fuse_fillstat(struct SECURITY_CONTEXT *scx,
+ 			struct fuse_entry_param *pentry, u64 iref)
+@@ -1012,7 +1020,7 @@
+ 	ni = ntfs_inode_open(ctx->vol, pentry->ino);
+ 	if (ni) {
+ 		if (!ntfs_fuse_getstat(scx, ni, &pentry->attr)) {
+-			pentry->generation = 1;
++			pentry->generation = GERACAO_NTFS(ni);
+ 			pentry->attr_timeout = ATTR_TIMEOUT;
+ 			pentry->entry_timeout = ENTRY_TIMEOUT;
+ 			ok = TRUE;
+@@ -2495,7 +2503,7 @@
+ 			ntfs_inode_update_mbsname(dir_ni, name, ni->mft_no);
+ 			NInoSetDirty(ni);
+ 			e->ino = ni->mft_no;
+-			e->generation = 1;
++			e->generation = GERACAO_NTFS(ni);
+ 			e->attr_timeout = ATTR_TIMEOUT;
+ 			e->entry_timeout = ENTRY_TIMEOUT;
+ 			res = ntfs_fuse_getstat(&security, ni, &e->attr);
+@@ -2649,7 +2657,7 @@
+ 		ntfs_inode_update_mbsname(dir_ni, newname, ni->mft_no);
+ 		if (e) {
+ 			e->ino = ni->mft_no;
+-			e->generation = 1;
++			e->generation = GERACAO_NTFS(ni);
+ 			e->attr_timeout = ATTR_TIMEOUT;
+ 			e->entry_timeout = ENTRY_TIMEOUT;
+ 			res = ntfs_fuse_getstat(&security, ni, &e->attr);

@@ -1,0 +1,21 @@
+--- a/ntfs-3g/src/lowntfs-3g.c	2026-10-17 17:54:26
++++ b/ntfs-3g/src/lowntfs-3g.c	2026-10-17 17:54:26
+@@ -473,7 +473,18 @@
+ 	 * File system block size. Used to calculate used/free space by df.
+ 	 * Incorrectly documented as "optimal transfer block size". 
+ 	 */
++#if defined(__APPLE__) || defined(__DARWIN__)
++		/*
++		 * ntfsoficial: f_bsize vira o f_iosize do volume no kext (fuse_vfsops.c), e o copyfile do macOS (cp,
++		 * Finder) usa esse valor como tamanho do buffer. Com o tamanho do cluster (4 KB, arredondado para
++		 * 16 KB) as gravações chegavam em pedaços de 16 KB e cada uma gerava ~4 gravações pequenas de
++		 * controle: 327 mil operações para copiar 1 GB (17/10/2026). 1 MiB = o iosize da montagem.
++		 * O f_frsize continua o tamanho do cluster (conta de espaço).
++		 */
++		sfs.f_bsize = 1048576;
++#else
+ 		sfs.f_bsize = vol->cluster_size;
++#endif
+ 
+ 	/* Fundamental file system block size, used as the unit. */
+ 		sfs.f_frsize = vol->cluster_size;

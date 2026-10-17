@@ -1,0 +1,199 @@
+--- a/ntfs-3g/libntfs-3g/unix_io.c	2026-10-17 17:28:14
++++ b/ntfs-3g/libntfs-3g/unix_io.c	2026-10-17 17:28:14
+@@ -66,6 +66,105 @@
+ 
+ #define DEV_FD(dev)	(*(int *)dev->d_private)
+ 
++#if defined(__APPLE__) || defined(__DARWIN__)
++#include <sys/disk.h>
++/*
++ * ntfsoficial: E/S alinhada para o dispositivo "raw" do macOS (/dev/rdiskN).
++ *
++ * O dispositivo de bloco (/dev/diskN) aceita qualquer tamanho, mas quebra as gravações em blocos pequenos
++ * e síncronos: 21 MB/s num SSD USB (17/10/2026). O raw é bem mais rápido, mas só aceita leituras e gravações
++ * em múltiplos do setor; o NTFS-3G pede tamanhos quebrados e falha ("ntfs_pread failed: Invalid argument").
++ * O driver do Tuxera resolve com o aligned_io.c ("built with USE_ALIGNED_IO", visto com o REA).
++ *
++ * Aqui: pedidos já alinhados vão direto; os outros leem o trecho alinhado que cobre o pedido e, na gravação,
++ * trocam só os bytes pedidos antes de gravar o trecho inteiro (ler-modificar-gravar).
++ * O primeiro campo continua sendo o descritor, então DEV_FD() segue valendo.
++ */
++struct unix_io_privado {
++	int fd;
++	u32 setor;	/* 0 = não precisa alinhar (arquivo ou dispositivo de bloco) */
++};
++#define DEV_SETOR(dev)	(((struct unix_io_privado *)dev->d_private)->setor)
++
++static void trecho_alinhado(u32 setor, s64 offset, s64 count, s64 *inicio, s64 *tam)
++{
++	s64 fim = offset + count;
++
++	*inicio = offset - offset % setor;
++	if (fim % setor)
++		fim += setor - fim % setor;
++	*tam = fim - *inicio;
++}
++
++static s64 pread_alinhado(int fd, u32 setor, void *buf, s64 count, s64 offset)
++{
++	s64 inicio, tam, desloc, disp, r;
++	ssize_t n;
++	char *tmp;
++	int err;
++
++	if (!setor || (!(offset % setor) && !(count % setor)))
++		return pread(fd, buf, count, offset);
++	trecho_alinhado(setor, offset, count, &inicio, &tam);
++	tmp = valloc(tam);
++	if (!tmp) {
++		errno = ENOMEM;
++		return -1;
++	}
++	n = pread(fd, tmp, tam, inicio);
++	if (n < 0) {
++		r = -1;
++	} else {
++		desloc = offset - inicio;
++		disp = (s64)n - desloc;
++		r = disp <= 0 ? 0 : (disp < count ? disp : count);
++		if (r > 0)
++			memcpy(buf, tmp + desloc, r);
++	}
++	err = errno;
++	free(tmp);
++	errno = err;
++	return r;
++}
++
++static s64 pwrite_alinhado(int fd, u32 setor, const void *buf, s64 count, s64 offset)
++{
++	s64 inicio, tam, desloc, r;
++	ssize_t n;
++	char *tmp;
++	int err;
++
++	if (!setor || (!(offset % setor) && !(count % setor)))
++		return pwrite(fd, buf, count, offset);
++	trecho_alinhado(setor, offset, count, &inicio, &tam);
++	tmp = valloc(tam);
++	if (!tmp) {
++		errno = ENOMEM;
++		return -1;
++	}
++	desloc = offset - inicio;
++	n = pread(fd, tmp, tam, inicio);
++	if (n < 0) {
++		r = -1;
++	} else {
++		if (n < tam)
++			memset(tmp + n, 0, tam - n);
++		memcpy(tmp + desloc, buf, count);
++		n = pwrite(fd, tmp, tam, inicio);
++		if (n < 0)
++			r = -1;
++		else if (n >= tam)
++			r = count;
++		else
++			r = (s64)n > desloc ? (((s64)n - desloc) < count ? (s64)n - desloc : count) : 0;
++	}
++	err = errno;
++	free(tmp);
++	errno = err;
++	return r;
++}
++#endif /* __APPLE__ */
++
+ /* Define to nothing if not present on this system. */
+ #ifndef O_EXCL
+ #	define O_EXCL 0
+@@ -131,7 +230,11 @@
+ 	if (S_ISBLK(sbuf.st_mode))
+ 		NDevSetBlock(dev);
+ 	
++#if defined(__APPLE__) || defined(__DARWIN__)
++	dev->d_private = ntfs_calloc(sizeof(struct unix_io_privado));
++#else
+ 	dev->d_private = ntfs_malloc(sizeof(int));
++#endif
+ 	if (!dev->d_private)
+ 		return -1;
+ 	/*
+@@ -164,6 +267,14 @@
+ 	}
+ #endif
+ 	
++#if defined(__APPLE__) || defined(__DARWIN__)
++	if (S_ISCHR(sbuf.st_mode)) {
++		u32 setor = 0;
++
++		if (!ioctl(DEV_FD(dev), DKIOCGETBLOCKSIZE, &setor) && setor > 1)
++			DEV_SETOR(dev) = setor;
++	}
++#endif
+ 	if ((flags & O_RDWR) != O_RDWR)
+ 		NDevSetReadOnly(dev);
+ 	
+@@ -260,6 +371,19 @@
+ static s64 ntfs_device_unix_io_read(struct ntfs_device *dev, void *buf,
+ 		s64 count)
+ {
++#if defined(__APPLE__) || defined(__DARWIN__)
++	if (DEV_SETOR(dev)) {
++		off_t pos = lseek(DEV_FD(dev), 0, SEEK_CUR);
++		s64 r;
++
++		if (pos < 0)
++			return -1;
++		r = pread_alinhado(DEV_FD(dev), DEV_SETOR(dev), buf, count, pos);
++		if (r > 0)
++			lseek(DEV_FD(dev), pos + r, SEEK_SET);
++		return r;
++	}
++#endif
+ 	return read(DEV_FD(dev), buf, count);
+ }
+ 
+@@ -281,6 +405,19 @@
+ 		return -1;
+ 	}
+ 	NDevSetDirty(dev);
++#if defined(__APPLE__) || defined(__DARWIN__)
++	if (DEV_SETOR(dev)) {
++		off_t pos = lseek(DEV_FD(dev), 0, SEEK_CUR);
++		s64 r;
++
++		if (pos < 0)
++			return -1;
++		r = pwrite_alinhado(DEV_FD(dev), DEV_SETOR(dev), buf, count, pos);
++		if (r > 0)
++			lseek(DEV_FD(dev), pos + r, SEEK_SET);
++		return r;
++	}
++#endif
+ 	return write(DEV_FD(dev), buf, count);
+ }
+ 
+@@ -298,7 +435,11 @@
+ static s64 ntfs_device_unix_io_pread(struct ntfs_device *dev, void *buf,
+ 		s64 count, s64 offset)
+ {
++#if defined(__APPLE__) || defined(__DARWIN__)
++	return pread_alinhado(DEV_FD(dev), DEV_SETOR(dev), buf, count, offset);
++#else
+ 	return pread(DEV_FD(dev), buf, count, offset);
++#endif
+ }
+ 
+ /**
+@@ -320,7 +461,11 @@
+ 		return -1;
+ 	}
+ 	NDevSetDirty(dev);
++#if defined(__APPLE__) || defined(__DARWIN__)
++	return pwrite_alinhado(DEV_FD(dev), DEV_SETOR(dev), buf, count, offset);
++#else
+ 	return pwrite(DEV_FD(dev), buf, count, offset);
++#endif
+ }
+ 
+ /**

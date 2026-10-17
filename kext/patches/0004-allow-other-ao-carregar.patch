@@ -1,0 +1,18 @@
+--- a/support/load_osxfuse/fuse_kext.c	2026-10-17 16:49:48
++++ b/support/load_osxfuse/fuse_kext.c	2026-10-17 16:49:48
+@@ -361,6 +361,15 @@
+                            &admin_gid, sizeof(admin_gid));
+     }
+ 
++    /*
++     * ntfsoficial: a montagem que o macOS lança pelo Finder roda como o usuário, mas só com o grupo
++     * principal (visto no log: "grupos 20"), sem o admin. O kext então negaria o allow_other que o
++     * NTFS-3G sempre pede (fuse_vfsops.c, EPERM). Com allow_other=1 o kext aceita sem conferir o grupo.
++     */
++    int allow_other = 1;
++    (void)sysctlbyname("vfs.generic." OSXFUSE_NAME ".tunables.allow_other", NULL, NULL,
++                       &allow_other, sizeof(allow_other));
++
+     return ret;
+ }
+ 

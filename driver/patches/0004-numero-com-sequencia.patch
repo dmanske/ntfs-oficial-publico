@@ -1,0 +1,53 @@
+--- a/ntfs-3g/src/lowntfs-3g.c	2026-10-17 17:40:39
++++ b/ntfs-3g/src/lowntfs-3g.c	2026-10-17 17:40:39
+@@ -1009,6 +1009,20 @@
+  * (17/10/2026). O kext confere a geração (fuse_node.c, "vnode changed generation"), como o do Tuxera (REA).
+  */
+ #define GERACAO_NTFS(ni)	((u64)le16_to_cpu((ni)->mrec->sequence_number) + 1)
++
++/*
++ * ntfsoficial: número entregue ao kext = registro MFT + número de sequência. Assim um arquivo que reaproveita
++ * o registro de outro recém-apagado chega como outro número, e o kext cria um vnode novo em vez de achar o
++ * velho (dados errados) ou devolver ESTALE na mudança de geração (os dois vistos no teste de estresse de
++ * 17/10/2026). O ntfs_inode_open() confere a sequência ("wrong SeqNo"), então um vnode velho nunca alcança
++ * o arquivo novo.
++ * O número é SEMPRE calculado do registro aberto (NO_FUSE_NI): a consulta por nome às vezes devolve a
++ * referência sem a sequência (cache de nomes), e calcular dela dava dois números para o mesmo arquivo
++ * (perdia dados ao anexar e renomear; visto no mesmo teste). A raiz continua com o número simples.
++ */
++#define NO_FUSE_NI(ni)	(((ni)->mft_no == FILE_root || !(ni)->mrec->sequence_number) ? \
++				(fuse_ino_t)(ni)->mft_no : \
++				(fuse_ino_t)MK_MREF((ni)->mft_no, le16_to_cpu((ni)->mrec->sequence_number)))
+ 
+ static __inline__ BOOL ntfs_fuse_fillstat(struct SECURITY_CONTEXT *scx,
+ 			struct fuse_entry_param *pentry, u64 iref)
+@@ -1016,9 +1030,9 @@
+ 	ntfs_inode *ni;
+ 	BOOL ok = FALSE;
+ 
+-	pentry->ino = MREF(iref);
+-	ni = ntfs_inode_open(ctx->vol, pentry->ino);
++	ni = ntfs_inode_open(ctx->vol, MREF(iref));
+ 	if (ni) {
++		pentry->ino = NO_FUSE_NI(ni);
+ 		if (!ntfs_fuse_getstat(scx, ni, &pentry->attr)) {
+ 			pentry->generation = GERACAO_NTFS(ni);
+ 			pentry->attr_timeout = ATTR_TIMEOUT;
+@@ -2502,7 +2516,7 @@
+ 				state |= CLOSE_DMTIME;
+ 			ntfs_inode_update_mbsname(dir_ni, name, ni->mft_no);
+ 			NInoSetDirty(ni);
+-			e->ino = ni->mft_no;
++			e->ino = NO_FUSE_NI(ni);
+ 			e->generation = GERACAO_NTFS(ni);
+ 			e->attr_timeout = ATTR_TIMEOUT;
+ 			e->entry_timeout = ENTRY_TIMEOUT;
+@@ -2656,7 +2670,7 @@
+ 		}
+ 		ntfs_inode_update_mbsname(dir_ni, newname, ni->mft_no);
+ 		if (e) {
+-			e->ino = ni->mft_no;
++			e->ino = NO_FUSE_NI(ni);
+ 			e->generation = GERACAO_NTFS(ni);
+ 			e->attr_timeout = ATTR_TIMEOUT;
+ 			e->entry_timeout = ENTRY_TIMEOUT;

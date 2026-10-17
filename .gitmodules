@@ -1,0 +1,7 @@
+[submodule "terceiros/osxfuse"]
+	path = terceiros/osxfuse
+	url = https://github.com/osxfuse/osxfuse.git
+	branch = archive/osxfuse-3
+[submodule "terceiros/ntfs-3g"]
+	path = terceiros/ntfs-3g
+	url = https://github.com/tuxera/ntfs-3g.git

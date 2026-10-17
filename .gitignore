@@ -1,0 +1,37 @@
+# Segredos
+.env
+.env.*
+!.env.example
+
+# Kiro: só as regras (steering) vão para o git
+.kiro/*
+!.kiro/steering/
+
+# Xcode / Swift / C
+.build/
+build/
+build-velho-*/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+*.o
+*.a
+*.dSYM/
+
+# Gerados (kext, ferramentas, pacotes)
+*.kext/
+release/
+*.pkg
+*.dmg
+*.zip
+
+# Imagens de disco de teste (nunca no git)
+*.img
+*.iso
+*.sparseimage
+*.vhd
+*.vhdx
+
+.DS_Store
+*.log

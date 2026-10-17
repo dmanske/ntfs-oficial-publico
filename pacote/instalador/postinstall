@@ -1,0 +1,61 @@
+#!/bin/bash
+# Depois de copiar os arquivos: o que scripts/instalar.sh faz depois da cópia.
+# Sem "set -e": cada passo pode falhar sem estragar a instalação (o kext, por exemplo, só carrega
+# depois que a pessoa aprova a extensão em Ajustes). Tudo vai para o log.
+set -u
+NOME="ntfsoficial"
+IDENTIFICADOR="com.danielmanske.ntfsoficial"
+ID_KEXT="${IDENTIFICADOR}.filesystems.${NOME}"
+SERVICO="${IDENTIFICADOR}.desmontar"
+PLIST_SERVICO="/Library/LaunchDaemons/${SERVICO}.plist"
+PACOTE_FS="/Library/Filesystems/${NOME}.fs"
+APP="/Applications/NTFS Oficial.app"
+LOG="/private/var/log/ntfsoficial-instalacao.log"
+
+exec >> "${LOG}" 2>&1
+echo "=== $(date '+%F %T') postinstall: início ==="
+
+echo "-> dono e permissões"
+chown -R root:wheel "${PACOTE_FS}" "${APP}"
+chown root:wheel "${PLIST_SERVICO}"; chmod 644 "${PLIST_SERVICO}"
+# Carregar o kext precisa de root; quem monta pelo Finder pode não ser root (o load_ é setuid root)
+chmod 4755 "${PACOTE_FS}/Contents/Resources/Support/load_${NOME}"
+chmod 755 "${PACOTE_FS}/Contents/Resources/Support/desinstalar-ntfs-oficial.command" 2>/dev/null
+
+echo "-> serviço de desmontagem ao desligar"
+launchctl bootout system "${PLIST_SERVICO}" 2>/dev/null
+launchctl bootstrap system "${PLIST_SERVICO}" || echo "AVISO: não foi possível carregar o serviço"
+launchctl print "system/${SERVICO}" 2>/dev/null | grep -E '^\s*state'
+
+echo "-> kext"
+KEXT_OK=0
+if kmutil showloaded --list-only 2>/dev/null | grep -q "${ID_KEXT}"; then
+    KEXT_OK=1
+else
+    # Num Mac novo isso dispara o pedido de aprovação (Ajustes -> Privacidade e Segurança); falhar aqui é esperado
+    "${PACOTE_FS}/Contents/Resources/Support/load_${NOME}" \
+        || kmutil load -p "${PACOTE_FS}/Contents/Extensions/${NOME}.kext" \
+        || echo "AVISO: kext não carregou (falta aprovar em Ajustes e reiniciar)"
+    kmutil showloaded --list-only 2>/dev/null | grep -q "${ID_KEXT}" && KEXT_OK=1
+fi
+if [ "${KEXT_OK}" = 1 ]; then
+    GRUPO_ADMIN="$(dscl . -read /Groups/admin PrimaryGroupID | awk '{print $2}')"
+    sysctl -w "vfs.generic.${NOME}.tunables.admin_group=${GRUPO_ADMIN}"
+    sysctl -w "vfs.generic.${NOME}.tunables.allow_other=1"
+else
+    echo "(kext não carregado: sysctl pulados)"
+fi
+
+echo "-> diskarbitrationd relê os pacotes de sistema de arquivos"
+launchctl kickstart -k system/com.apple.diskarbitrationd || echo "AVISO: kickstart do diskarbitrationd falhou"
+
+echo "-> abrindo o app para o usuário logado"
+USUARIO="$(stat -f '%Su' /dev/console 2>/dev/null)"
+UID_USUARIO="$(id -u "${USUARIO}" 2>/dev/null)"
+if [ -n "${USUARIO}" ] && [ "${USUARIO}" != "root" ] && [ -n "${UID_USUARIO}" ]; then
+    launchctl asuser "${UID_USUARIO}" open "${APP}" || echo "AVISO: não foi possível abrir o app"
+else
+    echo "(ninguém logado: app não aberto)"
+fi
+echo "=== $(date '+%F %T') postinstall: fim ==="
+exit 0

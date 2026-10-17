@@ -1,0 +1,40 @@
+--- a/support/load_osxfuse/fuse_kext.c	2026-10-17 14:12:24
++++ b/support/load_osxfuse/fuse_kext.c	2026-10-17 14:13:54
+@@ -147,7 +147,8 @@
+     #define kOSKextReturnSystemPolicy         -603946981
+ #endif
+ 
+-static int
++/* ntfsoficial: não é mais usada (ver fuse_kext_get_path) */
++__attribute__((unused)) static int
+ fuse_system_get_version(int *major, int *minor, int *bugfix)
+ {
+     int ret = 0;
+@@ -232,20 +233,13 @@
+ {
+     int ret = 0;
+ 
+-    int version_major = 0;
+-    int version_minor = 0;
+-
+-    if (fuse_system_get_version(&version_major, &version_minor, NULL)) {
+-        /*
+-         * In order to load the correct kernel extension we need to determine
+-         * the version of macOS. Since we cannot figure out which version is
+-         * running return ENOENT.
+-         */
+-        return ENOENT;
+-    }
+-
+-    ret = asprintf(path, "%s/%d.%d/%s", OSXFUSE_EXTENSIONS_PATH,
+-                   version_major, version_minor, OSXFUSE_KEXT_NAME);
++    /*
++     * ntfsoficial: um kext só, compilado para macOS 12 em diante, numa pasta fixa
++     * (Extensions/ntfsoficial.kext). O osxfuse usava uma pasta por versão do macOS
++     * (Extensions/27.0/...), que quebraria a cada atualização. O load_tuxera_ntfs
++     * também usa uma pasta fixa ("10.9") para todo macOS moderno (visto com o REA).
++     */
++    ret = asprintf(path, "%s/%s", OSXFUSE_EXTENSIONS_PATH, OSXFUSE_KEXT_NAME);
+     if (ret < 0) {
+         ret = errno;
+     } else {

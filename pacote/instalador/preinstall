@@ -1,0 +1,8 @@
+#!/bin/bash
+# Antes de instalar: fecha o app, se estiver aberto (para poder trocar os arquivos).
+# Não desmonta discos nem para o serviço (parar o serviço manda SIGTERM e ele desmontaria os discos).
+set -u
+LOG="/private/var/log/ntfsoficial-instalacao.log"
+echo "$(date '+%F %T') preinstall: início" >> "${LOG}" 2>/dev/null
+pkill -x NTFSOficial 2>/dev/null || true
+exit 0

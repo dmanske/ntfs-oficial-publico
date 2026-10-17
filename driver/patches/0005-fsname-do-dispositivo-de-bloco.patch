@@ -1,0 +1,20 @@
+--- a/ntfs-3g/src/ntfs-3g_common.c	2026-10-17 17:42:52
++++ b/ntfs-3g/src/ntfs-3g_common.c	2026-10-17 17:42:52
+@@ -622,6 +622,17 @@
+ 	
+ 	if (ntfs_strappend(&ret, "fsname="))
+ 		goto err_exit;
++#if defined(__APPLE__) || defined(__DARWIN__)
++	/*
++	 * ntfsoficial: montando pelo dispositivo raw (/dev/rdiskN, mais rápido), informa o de bloco (/dev/diskN)
++	 * como origem do volume: é por ele que o DiskArbitration e o Finder associam o volume ao disco.
++	 */
++	if (!strncmp(popts->device, "/dev/rdisk", 10)) {
++		if (ntfs_strappend(&ret, "/dev/") ||
++		    ntfs_strappend_escaped(&ret, popts->device + 6))
++			goto err_exit;
++	} else
++#endif
+ 	if (ntfs_strappend_escaped(&ret, popts->device)) {
+ 		goto err_exit;
+ 	}
