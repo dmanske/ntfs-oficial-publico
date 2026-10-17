@@ -42,13 +42,14 @@ cp "${RAIZ}/publico/DOCS_README.md" "${TEMP}/docs/README.md"   # o índice daqui
 rsync -a --delete --exclude .git --exclude terceiros/ "${TEMP}/" "${PASTA_PUBLICO}/"
 rm -rf "${TEMP:?}"
 
-echo "==> Submódulos (mesmos commits do privado)"
 cd "${PASTA_PUBLICO}"
+git add -A
+echo "==> Submódulos (mesmos commits do privado)"
+# Depois do add -A: as pastas não existem aqui, e o add -A apagaria os submódulos do índice
 git -C "${RAIZ}" ls-tree HEAD terceiros/ | while read -r modo tipo sha caminho; do
     if [ "${tipo}" = "commit" ]; then git update-index --add --cacheinfo "160000,${sha},${caminho}"; fi
 done
 
-git add -A
 if git diff --cached --quiet; then
     echo "(nada mudou no público)"
 else
