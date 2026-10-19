@@ -33,7 +33,9 @@ static int uso(const char *nome)
 {
     fprintf(stderr,
         "uso: %s -p <disco> <removable|fixed> <readonly|writable>   (detecção)\n"
-        "     mount_" NOME " [-o opções] <dispositivo> <ponto>          (montagem)\n", nome);
+        "     mount_" NOME " [-o opções] <dispositivo> <ponto>          (montagem)\n"
+        "     %s -v|-r <disco>                                     (verificar | reparar)\n"
+        "     newfs_" NOME " [-v rótulo] <disco>                       (formatar)\n", nome, nome);
     return RESPOSTA_INVALIDO;
 }
 
@@ -51,12 +53,27 @@ int main(int argc, char *argv[])
     if (strcmp(nome, "mount_" NOME) == 0) {
         return montar(argc, argv);
     }
+    if (strcmp(nome, "newfs_" NOME) == 0) {
+        return utilitario_formatar(argc, argv);
+    }
     if (argc >= 3 && strcmp(argv[1], "-p") == 0) {
         return detectar(argc, argv);
     }
     if (argc >= 2 && strcmp(argv[1], "-k") == 0) {
         /* -k: pedido de UUID do volume. Sem UUID (o NTFS não tem um no formato que o macOS espera). */
         return RESPOSTA_NAO_RECONHECIDO;
+    }
+    /* Utilitário de Disco (FSVerificationArguments -v, FSRepairArguments -r): as opções do tuxera_ntfs.util.
+     * "-r -q" / "-y -q" é verificação rápida (tux_util.c). */
+    if (argc >= 2 && strcmp(argv[1], "-v") == 0) {
+        return utilitario_verificar_reparar('v', argc - 2, argv + 2);
+    }
+    if (argc >= 2 && strcmp(argv[1], "-q") == 0) {
+        return utilitario_verificar_reparar('q', argc - 2, argv + 2);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "-r") == 0 || strcmp(argv[1], "-y") == 0)) {
+        bool rapido = argc >= 3 && strcmp(argv[2], "-q") == 0;
+        return utilitario_verificar_reparar(rapido ? 'q' : 'r', argc - 2, argv + 2);
     }
     return uso(nome);
 }

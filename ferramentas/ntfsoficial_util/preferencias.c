@@ -46,7 +46,8 @@ void preferencias_ler(preferencias_t *p)
     CFDictionaryRef d = abrir_plist();
     p->desligado    = ler_numero(d, CFSTR("DisableDriver"), 0) != 0;
     p->normalizacao = ler_numero(d, CFSTR("EnableNormalization"), 1) != 0;
-    p->recuperacao  = ler_numero(d, CFSTR("EnableAutomaticRecovery"), 0) != 0;
+    p->recuperacao  = ler_numero(d, CFSTR("EnableAutomaticRecovery"), 1) != 0;   /* padrão 1, como o Tuxera (REA) */
+    p->sfm          = ler_numero(d, CFSTR("EnableSFMConversions"), 1) != 0;      /* padrão 1, como o Tuxera (REA) */
     p->cache        = ler_numero(d, CFSTR("EnableCaching"), 1) != 0;
     p->raw          = ler_numero(d, CFSTR("EnableRawDevices"), 1) != 0;
     p->modo_xattr   = (int)ler_numero(d, CFSTR("XattrMode"), 2);

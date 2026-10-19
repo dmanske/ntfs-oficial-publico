@@ -69,13 +69,14 @@ extension EstadoApp {
                 let r = try await self.operacoes.verificar(d)
                 var texto: String
                 switch r.estado {
-                case .limpo: texto = Texto.t(.verLimpo)
+                case .limpo: texto = r.estruturaComProblema ? Texto.t(.verEstrutura) : Texto.t(.verLimpo)
                 case .hibernado: texto = Texto.t(.verHibernado)
+                case .cacheWindows: texto = Texto.t(.verCacheWindows)
                 case .sujo: texto = Texto.t(.verSujo)
                 case .erro(let codigo): texto = Texto.t(.verErro, codigo)
                 }
                 if d.montado && !r.remontou { texto += "\n\n" + Texto.t(.verNaoRemontou) }
-                Alertas.informar(titulo: titulo, texto: texto, detalhes: r.saida, aviso: r.estado != .limpo)
+                Alertas.informar(titulo: titulo, texto: texto, detalhes: r.saida, aviso: r.estado != .limpo || r.estruturaComProblema)
             } catch {
                 self.mostrarErro(error, titulo: titulo)
             }
@@ -89,6 +90,8 @@ extension EstadoApp {
             do {
                 let r = try await self.operacoes.reparar(d)
                 var texto = r.sucesso ? Texto.t(.repararOk) : Texto.t(.repararFalha)
+                if r.hibernado { texto = Texto.t(.repararHibernado) }
+                else if let replay = r.replay, replay != 0 { texto = Texto.t(.repararReplayFalhou) }
                 if d.montado && !r.remontou { texto += "\n\n" + Texto.t(.verNaoRemontou) }
                 Alertas.informar(titulo: d.nome, texto: texto, detalhes: r.saida, aviso: !r.sucesso)
             } catch {

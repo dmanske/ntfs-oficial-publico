@@ -39,8 +39,31 @@ final class AdministradorTests: XCTestCase {
     }
     func testComandosDasOperacoes() {
         let v = OperacoesDeDisco.comandoVerificar(bsd: "disk9s1")
-        XCTAssertTrue(v.contains("'--readwrite' '/dev/disk9s1'; echo \"probe=$?\""))
-        XCTAssertTrue(v.contains("'-n' '/dev/disk9s1'"))
+        XCTAssertTrue(v.contains("'--readwrite' '/dev/disk9s1' 2>&1); p=$?; "))
+        XCTAssertTrue(v.contains("echo \"probe=$p\""))
+        // ntfsrecover -n só com probe 14/15 e fora da hibernação; ntfsfix -n sempre; nada grava
+        XCTAssertTrue(v.contains("'/Library/Filesystems/ntfsoficial.fs/Contents/Resources/Support/ntfsrecover' '-n' '/dev/disk9s1'; echo \"recover=$?\""))
+        XCTAssertTrue(v.contains("grep -qi hibernated"))
+        XCTAssertTrue(v.hasSuffix("'/Library/Filesystems/ntfsoficial.fs/Contents/Resources/Support/ntfsfix' '-n' '/dev/disk9s1'; echo \"ntfsfix=$?\""))
+        XCTAssertFalse(v.contains("'-d'"))
+        XCTAssertFalse(v.contains("'-k'"))
+        let r = OperacoesDeDisco.comandoReparar(bsd: "disk9s1")
+        // ntfsrecover (replay, com limite de 60 s) antes do ntfsfix; ntfsfix só se o replay deu 0; nunca -d nem -k
+        let iRecover = try! XCTUnwrap(r.range(of: "ntfsrecover' '/dev/disk9s1'")).lowerBound
+        let iFix = try! XCTUnwrap(r.range(of: "ntfsfix' '/dev/disk9s1'")).lowerBound
+        XCTAssertLessThan(iRecover, iFix)
+        XCTAssertTrue(r.contains("'alarm 60; exec @ARGV'"))
+        // ntfsfix só se o ntfsfix -n achar erro (num disco em ordem ele só deixaria a marca de "sujo")
+        XCTAssertTrue(r.contains("if [ \"$r\" = 0 ]; then '/Library/Filesystems/ntfsoficial.fs/Contents/Resources/Support/ntfsfix' '-n' '/dev/disk9s1'"))
+        XCTAssertTrue(r.contains("if [ \"$n\" != 0 ]; then '/Library/Filesystems/ntfsoficial.fs/Contents/Resources/Support/ntfsfix' '/dev/disk9s1'"))
+        XCTAssertTrue(OperacoesDeDisco.reparoDeuCerto(saida: "probe=0\nntfsfix_n=0\n"))
+        XCTAssertTrue(OperacoesDeDisco.reparoDeuCerto(saida: "probe=0\nntfsfix_n=1\nntfsfix=0\n"))
+        XCTAssertFalse(OperacoesDeDisco.reparoDeuCerto(saida: "probe=0\nntfsfix_n=1\nntfsfix=1\n"))
+        XCTAssertFalse(OperacoesDeDisco.reparoDeuCerto(saida: "probe=15\nrecover=1\n"))
+        XCTAssertFalse(OperacoesDeDisco.reparoDeuCerto(saida: "probe=14\nhibernado=1\n"))
+        XCTAssertTrue(r.contains("hibernado=1"))
+        XCTAssertFalse(r.contains("'-d'"))
+        XCTAssertFalse(r.contains("'-k'"))
         XCTAssertTrue(OperacoesDeDisco.comandoFormatarNTFS(bsd: "disk9s1", nome: "O'Brien").contains("'-L' 'O'\\''Brien' '/dev/disk9s1'"))
         XCTAssertEqual(OperacoesDeDisco.argumentosDiskutil(formato: .fat32, nome: "A", bsd: "disk9s1")!,
                        ["eraseVolume", "MS-DOS FAT32", "A", "disk9s1"])
@@ -54,6 +77,18 @@ final class PreferenciasTests: XCTestCase {
         XCTAssertEqual(p, PreferenciasDriver())
         XCTAssertEqual(p.enableRawDevices, 1)
         XCTAssertEqual(p.xattrMode, 2)
+        // como o Tuxera (REA): recuperação automática e conversão SFM ligadas por padrão
+        XCTAssertEqual(p.enableAutomaticRecovery, 1)
+        XCTAssertEqual(p.enableSFMConversions, 1)
+    }
+    func testLerSFMeRecuperacaoDesligadas() throws {
+        let caminho = NSTemporaryDirectory() + "prefs-\(UUID().uuidString).plist"
+        defer { try? FileManager.default.removeItem(atPath: caminho) }
+        let dic: NSDictionary = ["EnableAutomaticRecovery": 0, "EnableSFMConversions": false]
+        XCTAssertTrue(dic.write(toFile: caminho, atomically: true))
+        let p = PreferenciasDriver.ler(caminho: caminho)
+        XCTAssertEqual(p.enableAutomaticRecovery, 0)
+        XCTAssertEqual(p.enableSFMConversions, 0)
     }
     func testLerPlist() throws {
         let caminho = NSTemporaryDirectory() + "prefs-\(UUID().uuidString).plist"
@@ -72,7 +107,9 @@ final class PreferenciasTests: XCTestCase {
         let c = p.comandoGravar(caminho: "/tmp/x.plist")
         XCTAssertTrue(c.hasPrefix("'/usr/bin/defaults' 'write' '/tmp/x.plist' 'DisableDriver' '-int' '0' && "))
         XCTAssertTrue(c.contains("'EnableCaching' '-int' '0'"))
-        XCTAssertEqual(c.components(separatedBy: " && ").count, 6)
+        XCTAssertTrue(c.contains("'EnableSFMConversions' '-int' '1'"))
+        XCTAssertTrue(c.contains("'EnableAutomaticRecovery' '-int' '1'"))
+        XCTAssertEqual(c.components(separatedBy: " && ").count, 7)
     }
 }
 
@@ -112,6 +149,12 @@ final class ProbeETMotivoTests: XCTestCase {
         XCTAssertEqual(InterpretacaoProbe.estado(codigo: 14), .hibernado)
         XCTAssertEqual(InterpretacaoProbe.estado(codigo: 15), .sujo)
         XCTAssertEqual(InterpretacaoProbe.estado(codigo: 3), .erro(codigo: 3))
+        // o 14 vale para hiberfil.sys e para o journal 2.0; a mensagem do probe separa
+        XCTAssertEqual(InterpretacaoProbe.estado(codigo: 14, saida: "Windows is hibernated, refused to mount.\n"), .hibernado)
+        XCTAssertEqual(InterpretacaoProbe.estado(codigo: 14, saida: "Hibernated non-system partition, refused to mount."), .hibernado)
+        XCTAssertEqual(InterpretacaoProbe.estado(codigo: 14, saida: "Metadata kept in Windows cache, refused to mount.\n"), .cacheWindows)
+        XCTAssertEqual(InterpretacaoProbe.estado(codigo: 15, saida: "The disk contains an unclean file system (0, 0).\n"), .sujo)
+        XCTAssertEqual(InterpretacaoProbe.estado(codigo: 0, saida: ""), .limpo)
         XCTAssertEqual(InterpretacaoProbe.codigo(na: "lixo\nprobe=15\nntfsfix=0\n", marcador: "probe"), 15)
         XCTAssertEqual(InterpretacaoProbe.codigo(na: "lixo\nprobe=15\nntfsfix=0\n", marcador: "ntfsfix"), 0)
         XCTAssertNil(InterpretacaoProbe.codigo(na: "nada", marcador: "probe"))

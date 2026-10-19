@@ -6,7 +6,11 @@ public struct PreferenciasDriver: Equatable, Sendable {
     public var enableRawDevices = 1
     public var enableCaching = 1
     public var enableNormalization = 1
-    public var enableAutomaticRecovery = 0
+    /// 1 (padrão, como o Tuxera): se o disco ficou sujo, reaplica o journal do Windows (ntfsrecover) e monta com
+    /// gravação. Não é mais a opção `recover` do NTFS-3G, que só zerava o journal e perdia transações.
+    public var enableAutomaticRecovery = 1
+    /// 1 (padrão, como o Tuxera): nomes com : * ? " < > | gravados como caracteres SFM (sfmconv). 0: recusa.
+    public var enableSFMConversions = 1
     /// 2 = tudo (etiquetas e metadados do Mac), 1 = só o essencial, 0 = nenhum.
     public var xattrMode = 2
 
@@ -24,6 +28,7 @@ public struct PreferenciasDriver: Equatable, Sendable {
         p.enableCaching = inteiro("EnableCaching", p.enableCaching)
         p.enableNormalization = inteiro("EnableNormalization", p.enableNormalization)
         p.enableAutomaticRecovery = inteiro("EnableAutomaticRecovery", p.enableAutomaticRecovery)
+        p.enableSFMConversions = inteiro("EnableSFMConversions", p.enableSFMConversions)
         p.xattrMode = inteiro("XattrMode", p.xattrMode)
         return p
     }
@@ -31,7 +36,8 @@ public struct PreferenciasDriver: Equatable, Sendable {
     var pares: [(String, Int)] {
         [("DisableDriver", disableDriver), ("EnableRawDevices", enableRawDevices),
          ("EnableCaching", enableCaching), ("EnableNormalization", enableNormalization),
-         ("EnableAutomaticRecovery", enableAutomaticRecovery), ("XattrMode", xattrMode)]
+         ("EnableAutomaticRecovery", enableAutomaticRecovery), ("EnableSFMConversions", enableSFMConversions),
+         ("XattrMode", xattrMode)]
     }
 
     /// Um comando só (uma senha só): `defaults write <plist> <Chave> -int <v> && …`.

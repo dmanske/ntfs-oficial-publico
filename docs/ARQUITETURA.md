@@ -46,7 +46,8 @@ ntfs-oficial/
     Sources/NTFSOficialMotor/   discos (DiskArbitration), chamar as ferramentas, preferências
     Sources/NTFSOficial/        app SwiftUI (App/, Features/<Tela>/, Shared/Config.swift)
     Tests/NTFSOficialMotorTests/
-  scripts/            compilar tudo, assinar, instalar, montar o .pkg, publicar, testes
+  scripts/            compilar tudo, assinar, instalar, montar o .pkg, publicar, testes, medições
+    engenharia-reversa/   extrair e exportar os binários do Tuxera com o Ghidra (fora do público)
   identidade/         marca (ícone, símbolos, logo, papel de parede) e telas-alvo — ver docs/design/DESIGN_SYSTEM.md
   publico/            README, LICENSE e notas da versão do repositório público
   docs/

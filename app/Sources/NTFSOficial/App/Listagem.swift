@@ -21,7 +21,7 @@ enum Listagem {
         let conflitos = Conflitos.detectar()
         print("Drivers conflitantes: \(conflitos.isEmpty ? "nenhum" : conflitos.map(\.rawValue).joined(separator: ", "))")
         let p = PreferenciasDriver.ler()
-        print("Preferências: DisableDriver=\(p.disableDriver) Raw=\(p.enableRawDevices) Cache=\(p.enableCaching) Recovery=\(p.enableAutomaticRecovery) Xattr=\(p.xattrMode)")
+        print("Preferências: DisableDriver=\(p.disableDriver) Raw=\(p.enableRawDevices) Cache=\(p.enableCaching) Recovery=\(p.enableAutomaticRecovery) SFM=\(p.enableSFMConversions) Xattr=\(p.xattrMode)")
         exit(0)
     }
 }

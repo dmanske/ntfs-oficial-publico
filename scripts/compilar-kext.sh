@@ -22,10 +22,13 @@ PRIMEIRA=""; EXECUTAVEIS=()
 for ARQ in ${ARQUITETURAS_KEXT}; do
     echo "==> Compilando kext (${ARQ}, macOS ${MACOS_MINIMO}+)"
     if [ -z "${PRIMEIRA}" ]; then PRIMEIRA="${ARQ}"; DESTINO="${SAIDA}/kext"; else DESTINO="${BUILD}/obj/kext-saida-${ARQ}"; fi
+    # Sempre do zero: o Info.plist do kext pega a versão de um cabeçalho (#include <fuse_version.h>) e o Xcode não
+    # refaz o Preprocessed-Info.plist quando só o cabeçalho muda (18/10/2026: kext 0.1.1 saiu com CFBundleVersion 0.1.0)
+    rm -rf "${BUILD}/obj/kext-${ARQ}"
     mkdir -p "${BUILD}/obj/kext-${ARQ}"
     if ! xcodebuild -project "${ORIGEM}/kext/osxfuse.xcodeproj" -target osxfuse -configuration Release \
             ARCHS="${ARQ}" VALID_ARCHS="${ARQ}" ONLY_ACTIVE_ARCH=NO \
-            MACOSX_DEPLOYMENT_TARGET="${MACOS_MINIMO}" OSXFUSE_VERSION="${VERSAO}" \
+            MACOSX_DEPLOYMENT_TARGET="${MACOS_MINIMO}" OSXFUSE_VERSION="${VERSAO_KEXT}" \
             PRODUCT_NAME="${NOME}" CODE_SIGN_IDENTITY="${ASSINATURA}" \
             WARNING_CFLAGS="\$(inherited) ${AVISOS_DESLIGADOS}" \
             SYMROOT="${DESTINO}" OBJROOT="${BUILD}/obj/kext-${ARQ}" build >> "${LOG}" 2>&1; then

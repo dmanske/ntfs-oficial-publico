@@ -22,7 +22,7 @@ sed -i '' \
     -e "s/^#define OSXFUSE_NAME_LITERAL .*/#define OSXFUSE_NAME_LITERAL                ${NOME}/" \
     -e "s/^#define OSXFUSE_DISPLAY_NAME_LITERAL .*/#define OSXFUSE_DISPLAY_NAME_LITERAL        ${NOME_EXIBICAO}/" \
     -e "s/^#define OSXFUSE_IDENTIFIER_LITERAL .*/#define OSXFUSE_IDENTIFIER_LITERAL          ${IDENTIFICADOR}/" \
-    -e "s/^#define OSXFUSE_VERSION_LITERAL .*/#define OSXFUSE_VERSION_LITERAL             ${VERSAO}/" \
+    -e "s/^#define OSXFUSE_VERSION_LITERAL .*/#define OSXFUSE_VERSION_LITERAL             ${VERSAO_KEXT}/" \
     -e "s/^#define OSXFUSE_TIMESTAMP .*/#define OSXFUSE_TIMESTAMP                   \"sem data\"/" \
     "${V}"
 # Sem __DATE__/__TIME__ no kext: o mesmo código gera o mesmo kext (mesmo CDHash), e o macOS não pede

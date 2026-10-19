@@ -29,6 +29,7 @@ NOVO="${SAIDA}/${NOME}.fs"
 if [ -d "${KEXT_INSTALADO}" ] && [ "$(cdhash "${KEXT_INSTALADO}")" != "$(cdhash "${NOVO}/Contents/Extensions/${NOME}.kext")" ]; then
     if [ "${TROCAR_KEXT}" = 1 ]; then
         echo "==> Kext novo (CDHash diferente): vai precisar aprovar em Ajustes e reiniciar."
+        KEXT_MUDOU=1
     else
         echo "==> Kext compilado é diferente do aprovado; mantendo o instalado (use --kext-novo para trocar)."
         rsync -a --delete "${KEXT_INSTALADO}/" "${NOVO}/Contents/Extensions/${NOME}.kext/"
@@ -61,6 +62,17 @@ if [ "${DESLIGAR_TUXERA}" = 1 ] && [ -f /Library/Preferences/com.tuxera.NTFS.pli
 fi
 
 echo "==> Kext"
+# Kext trocado (--kext-novo) com o antigo ainda carregado: o macOS só pede a aprovação quando alguém tenta carregar
+# o novo, e o trecho abaixo só carrega se não houver nenhum. Então: desmonta os discos (kext em uso não descarrega),
+# descarrega o antigo e pede a carga do novo, como na fase 0 (18/10/2026: sem isto não apareceu nada em Ajustes).
+if [ "${KEXT_MUDOU:-0}" = 1 ] && kmutil showloaded --list-only 2>/dev/null | grep -q "${ID_KEXT}"; then
+    /sbin/mount -t "${NOME}" | while IFS= read -r linha; do
+        diskutil unmount "${linha%% on *}" || diskutil unmount force "${linha%% on *}" || true
+    done
+    sudo kmutil unload -b "${ID_KEXT}" || true
+    sudo kmutil load -p "${KEXT_INSTALADO}" \
+        || echo "Agora: Ajustes do Sistema → Privacidade e Segurança → permitir → reiniciar."
+fi
 # Carregar pelo load_ntfsoficial (como o load_tuxera_ntfs, visto com o REA): além de carregar, ele grava
 # o grupo admin em tunables.admin_group. Sem isso (valor 0 = wheel), quem não é root não consegue montar
 # com allow_other e a montagem pelo Finder cai logo depois de abrir o disco.

@@ -3,6 +3,9 @@ import Foundation
 public enum EstadoVolume: Equatable, Sendable {
     case limpo
     case hibernado
+    /// Probe 14 sem hiberfil.sys: $LogFile versão 2.0, metadados no cache do Windows (Inicialização rápida ou
+    /// disco arrancado do Windows 8+). O ntfsrecover recusa sem -k (que perde dados), então fica só leitura.
+    case cacheWindows
     case sujo
     case erro(codigo: Int)
 }
@@ -17,6 +20,13 @@ public enum InterpretacaoProbe {
         case 15: return .sujo
         default: return .erro(codigo: codigo)
         }
+    }
+
+    /// Igual a `estado(codigo:)`, mas separa os dois significados do 14 pela mensagem do probe: "Windows is
+    /// hibernated" / "Hibernated non-system partition" (hiberfil.sys) ou "Metadata kept in Windows cache".
+    public static func estado(codigo: Int, saida: String) -> EstadoVolume {
+        if codigo == 14, !saida.lowercased().contains("hibernated") { return .cacheWindows }
+        return estado(codigo: codigo)
     }
 
     /// Acha `<marcador>=<número>` numa saída com várias linhas.

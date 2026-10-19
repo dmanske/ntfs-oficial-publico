@@ -6,6 +6,7 @@ public enum CaminhosDriver {
     public static let support = pacote + "/Contents/Resources/Support"
     public static let ntfsfix = support + "/ntfsfix"
     public static let probe = support + "/ntfs-3g.probe"
+    public static let ntfsrecover = support + "/ntfsrecover"
     public static let mkntfs = support + "/mkntfs"
     public static let ntfslabel = support + "/ntfslabel"
     /// Preferências do driver (as mesmas que o ntfsoficial.util lê).

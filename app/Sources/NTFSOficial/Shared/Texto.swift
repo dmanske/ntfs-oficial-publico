@@ -19,8 +19,8 @@ enum Chave {
     case ejetarFalhouTitulo, ejetarFalhouTexto, forcarEjecao
     case desmontarFalhouTitulo, desmontarFalhouTexto, forcarDesmontagem
     case montarFalhouTitulo
-    case verificarTitulo, verLimpo, verHibernado, verSujo, verErro, verNaoRemontou
-    case repararConfirmaTitulo, repararConfirmaTexto, repararBotao, repararOk, repararFalha
+    case verificarTitulo, verLimpo, verHibernado, verCacheWindows, verSujo, verEstrutura, verErro, verNaoRemontou
+    case repararConfirmaTitulo, repararConfirmaTexto, repararBotao, repararOk, repararFalha, repararHibernado, repararReplayFalhou
     case senhaCancelada
     // Formatar
     case formatarTitulo, formatarTexto, formatarNome, formatarFormato, fmtNTFS, fmtExFAT, fmtFAT32
@@ -30,6 +30,7 @@ enum Chave {
     case avisoDriverTitulo, avisoDriverTexto, drvTuxera, drvParagon, drvMacFuse
     // Preferências
     case prefMontarGravacao, prefModoRapido, prefModoRapidoDesc, prefCache, prefCacheDesc
+    case prefSFM, prefSFMDesc
     case prefReparo, prefReparoDesc, prefXattr, xattrTudo, xattrEssencial, xattrNenhum
     case prefIdioma, prefLogin, prefAplicar, prefRodape, prefVersao, prefAplicadoOk, prefLoginErro
     // Gerenciador (visual novo)
@@ -131,14 +132,18 @@ enum Texto {
         case .verificarTitulo: return "Verificação de “%@”"
         case .verLimpo: return "O disco está limpo e pode ser montado com gravação."
         case .verHibernado: return "O disco está hibernado pelo Windows (ou com a Inicialização rápida ligada). Ele só monta para leitura. Para gravar: no Windows, desligue a Inicialização rápida e use Desligar (não Hibernar)."
-        case .verSujo: return "O disco não foi desconectado direito (indicador de sujo). Use Reparar, ou rode “chkdsk /f” no Windows."
+        case .verCacheWindows: return "O Windows deixou alterações no cache da Inicialização rápida (journal versão 2.0). O disco só monta para leitura, porque reaplicá-las perderia dados. Para gravar: conecte no Windows, desligue a Inicialização rápida e use Desligar (não Hibernar)."
+        case .verSujo: return "O disco não foi desconectado direito (journal do Windows pendente). Use Reparar: o NTFS Oficial reaplica as alterações que o Windows já tinha confirmado. Se não for possível, rode “chkdsk /f” no Windows."
+        case .verEstrutura: return "O journal está em ordem, mas o ntfsfix -n encontrou problemas na estrutura do disco (boot, $MFT ou $MFTMirr). Veja os detalhes abaixo; Reparar tenta corrigir."
         case .verErro: return "A verificação terminou com o código %d. Veja os detalhes abaixo."
         case .verNaoRemontou: return "O disco não voltou a montar sozinho: use Montar."
         case .repararConfirmaTitulo: return "Reparar “%@”?"
-        case .repararConfirmaTexto: return "O disco será desmontado, o ntfsfix zera o journal e limpa o indicador de sujo, e depois o disco é montado de novo. Pede a senha do Mac.\n\nNão é um chkdsk completo: para dano sério, use “chkdsk /f” no Windows."
+        case .repararConfirmaTexto: return "O disco será desmontado e o ntfsrecover reaplica o journal do Windows (as alterações que ele já tinha confirmado e não chegou a gravar). Depois o ntfsfix confere a estrutura e deixa o disco marcado para o Windows rodar o chkdsk no próximo uso, e o disco é montado de novo. Pede a senha do Mac.\n\nNão é um chkdsk completo: para dano sério, use “chkdsk /f” no Windows."
         case .repararBotao: return "Reparar"
         case .repararOk: return "Reparo concluído."
         case .repararFalha: return "O reparo terminou com erro. Para dano sério, use “chkdsk /f” no Windows."
+        case .repararHibernado: return "O Windows está hibernado neste disco. Nada foi alterado. No Windows, desligue a Inicialização rápida e use Desligar (não Hibernar)."
+        case .repararReplayFalhou: return "Não foi possível reaplicar o journal do Windows (ou ele está no cache da Inicialização rápida). Nada foi alterado. Conecte o disco no Windows e rode “chkdsk /f”."
         case .senhaCancelada: return "Operação cancelada (senha não informada)."
         case .formatarTitulo: return "Formatar “%@”?"
         case .formatarTexto: return "Tudo o que está no disco será apagado. Isso não pode ser desfeito."
@@ -167,8 +172,10 @@ enum Texto {
         case .prefModoRapidoDesc: return "Acesso direto ao disco para maior desempenho."
         case .prefCache: return "Gravar com cache"
         case .prefCacheDesc: return "Grava em segundo plano: mais rápido, mas ejete sempre antes de tirar o cabo."
-        case .prefReparo: return "Reparar sozinho disco desconectado sem ejetar"
-        case .prefReparoDesc: return "Risco: o reparo automático pode mexer num disco que deveria só ser lido. Desativada por padrão."
+        case .prefSFM: return "Nomes do Mac que o Windows recusa"
+        case .prefSFMDesc: return "Permite nomes com : * ? \" < > | gravados como caracteres especiais que o Windows mostra diferente (como o Tuxera). Desligado, esses nomes são recusados."
+        case .prefReparo: return "Recuperar sozinho disco desconectado sem ejetar"
+        case .prefReparoDesc: return "Reaplica o journal do Windows (as alterações que ele já tinha confirmado) antes de montar com gravação, como o Tuxera. Se não der, o disco monta só para leitura. Ligada por padrão."
         case .prefXattr: return "Etiquetas e metadados do Mac"
         case .xattrTudo: return "Tudo (recomendado)"
         case .xattrEssencial: return "Só o essencial"
@@ -279,14 +286,18 @@ enum Texto {
         case .verificarTitulo: return "Verification of “%@”"
         case .verLimpo: return "The disk is clean and can be mounted read/write."
         case .verHibernado: return "The disk is hibernated by Windows (or Fast Startup is on). It only mounts read-only. To write: in Windows, turn off Fast Startup and use Shut down (not Hibernate)."
-        case .verSujo: return "The disk was not unplugged properly (dirty flag). Use Repair, or run “chkdsk /f” in Windows."
+        case .verCacheWindows: return "Windows left changes in the Fast Startup cache (journal version 2.0). The disk only mounts read-only, because replaying them would lose data. To write: connect it to Windows, turn off Fast Startup and use Shut down (not Hibernate)."
+        case .verSujo: return "The disk was not unplugged properly (pending Windows journal). Use Repair: NTFS Oficial replays the changes Windows had already committed. If that is not possible, run “chkdsk /f” in Windows."
+        case .verEstrutura: return "The journal is fine, but ntfsfix -n found problems in the disk structure (boot sector, $MFT or $MFTMirr). See the details below; Repair tries to fix them."
         case .verErro: return "The verification ended with code %d. See the details below."
         case .verNaoRemontou: return "The disk did not mount again by itself: use Mount."
         case .repararConfirmaTitulo: return "Repair “%@”?"
-        case .repararConfirmaTexto: return "The disk will be unmounted, ntfsfix resets the journal and clears the dirty flag, and then the disk is mounted again. Asks for the Mac password.\n\nThis is not a full chkdsk: for serious damage, use “chkdsk /f” in Windows."
+        case .repararConfirmaTexto: return "The disk will be unmounted and ntfsrecover replays the Windows journal (the changes it had already committed but not written). Then ntfsfix checks the structure and leaves the disk marked for Windows to run chkdsk on its next use, and the disk is mounted again. Asks for the Mac password.\n\nThis is not a full chkdsk: for serious damage, use “chkdsk /f” in Windows."
         case .repararBotao: return "Repair"
         case .repararOk: return "Repair finished."
         case .repararFalha: return "The repair ended with an error. For serious damage, use “chkdsk /f” in Windows."
+        case .repararHibernado: return "Windows is hibernated on this disk. Nothing was changed. In Windows, turn off Fast Startup and use Shut down (not Hibernate)."
+        case .repararReplayFalhou: return "The Windows journal could not be replayed (or it is in the Fast Startup cache). Nothing was changed. Connect the disk to Windows and run “chkdsk /f”."
         case .senhaCancelada: return "Operation cancelled (no password given)."
         case .formatarTitulo: return "Format “%@”?"
         case .formatarTexto: return "Everything on the disk will be erased. This cannot be undone."
@@ -315,8 +326,10 @@ enum Texto {
         case .prefModoRapidoDesc: return "Direct disk access for better performance."
         case .prefCache: return "Write with cache"
         case .prefCacheDesc: return "Writes in the background: faster, but always eject before unplugging."
-        case .prefReparo: return "Auto-repair a disk unplugged without ejecting"
-        case .prefReparoDesc: return "Risk: automatic repair may touch a disk that should only be read. Off by default."
+        case .prefSFM: return "Mac names that Windows rejects"
+        case .prefSFMDesc: return "Allows names with : * ? \" < > | stored as special characters that Windows displays differently (like Tuxera). When off, those names are refused."
+        case .prefReparo: return "Auto-recover a disk unplugged without ejecting"
+        case .prefReparoDesc: return "Replays the Windows journal (the changes it had already committed) before mounting read/write, like Tuxera. If that fails, the disk mounts read-only. On by default."
         case .prefXattr: return "Mac tags and metadata"
         case .xattrTudo: return "Everything (recommended)"
         case .xattrEssencial: return "Essentials only"

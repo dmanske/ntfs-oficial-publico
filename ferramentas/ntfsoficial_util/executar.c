@@ -10,6 +10,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <spawn.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +20,11 @@
 extern char **environ;
 
 int executar(char *const argv[], char *saida, size_t tamanho)
+{
+    return executar_limite(argv, saida, tamanho, 0);
+}
+
+int executar_limite(char *const argv[], char *saida, size_t tamanho, int segundos)
 {
     char modelo[] = "/tmp/" NOME ".XXXXXX";
     int fd_saida = -1;
@@ -48,10 +54,31 @@ int executar(char *const argv[], char *saida, size_t tamanho)
     }
 
     int estado;
-    while (waitpid(pid, &estado, 0) < 0) {
-        if (errno != EINTR) {
+    if (segundos > 0) {
+        /* com limite de tempo: olha de 50 em 50 ms e mata o programa se passar do limite */
+        int esperado_ms = 0;
+        pid_t quem;
+        while ((quem = waitpid(pid, &estado, WNOHANG)) == 0) {
+            if (esperado_ms >= segundos * 1000) {
+                registro_erro("%s passou de %d s, encerrando", argv[0], segundos);
+                kill(pid, SIGKILL);
+                waitpid(pid, &estado, 0);
+                if (fd_saida >= 0) close(fd_saida);
+                return -1;
+            }
+            usleep(50000);
+            esperado_ms += 50;
+        }
+        if (quem < 0) {
             if (fd_saida >= 0) close(fd_saida);
             return -1;
+        }
+    } else {
+        while (waitpid(pid, &estado, 0) < 0) {
+            if (errno != EINTR) {
+                if (fd_saida >= 0) close(fd_saida);
+                return -1;
+            }
         }
     }
 

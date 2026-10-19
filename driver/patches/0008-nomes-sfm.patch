@@ -1,0 +1,274 @@
+--- a/ntfs-3g/include/ntfs-3g/unistr.h
++++ b/ntfs-3g/include/ntfs-3g/unistr.h
+@@ -57,6 +57,16 @@
+ 		int outs_len);
+ extern int ntfs_mbstoucs(const char *ins, ntfschar **outs);
+ 
++/*
++ * ntfsoficial: versões "de nome de arquivo" das conversões, que aplicam a troca de caracteres do SFM (Services for
++ * Macintosh: ":" <-> U+F022 etc.) quando a opção sfmconv está ligada. Usar só para NOMES de arquivo/pasta; destinos
++ * de link simbólico, nomes de xattr e rótulo do volume continuam nas conversões comuns.
++ */
++extern int ntfs_name_sfmconv(int ligado);
++extern int ntfs_mbstoucs_name(const char *ins, ntfschar **outs);
++extern int ntfs_ucstombs_name(const ntfschar *ins, const int ins_len,
++		char **outs, int outs_len);
++
+ extern char *ntfs_uppercase_mbs(const char *low,
+ 		const ntfschar *upcase, u32 upcase_len);
+ 
+--- a/ntfs-3g/libntfs-3g/dir.c
++++ b/ntfs-3g/libntfs-3g/dir.c
+@@ -567,7 +567,7 @@
+ 					errno = ENOENT;
+ 			} else {
+ 				/* Generate unicode name. */
+-				uname_len = ntfs_mbstoucs(name, &uname);
++				uname_len = ntfs_mbstoucs_name(name, &uname);
+ 				if (uname_len >= 0) {
+ 					inum = ntfs_inode_lookup_by_name(dir_ni,
+ 							uname, uname_len);
+@@ -584,7 +584,7 @@
+ #endif
+ 			{
+ 				/* Generate unicode name. */
+-			uname_len = ntfs_mbstoucs(cached_name, &uname);
++			uname_len = ntfs_mbstoucs_name(cached_name, &uname);
+ 			if (uname_len >= 0)
+ 				inum = ntfs_inode_lookup_by_name(dir_ni,
+ 						uname, uname_len);
+@@ -754,7 +754,7 @@
+ 			 * insert into cache if found
+ 			 */
+ 		if (!cached) {
+-			len = ntfs_mbstoucs(p, &unicode);
++			len = ntfs_mbstoucs_name(p, &unicode);
+ 			if (len < 0) {
+ 				ntfs_log_perror("Could not convert filename to Unicode:"
+ 					" '%s'", p);
+@@ -773,7 +773,7 @@
+ 			}
+ 		}
+ #else
+-		len = ntfs_mbstoucs(p, &unicode);
++		len = ntfs_mbstoucs_name(p, &unicode);
+ 		if (len < 0) {
+ 			ntfs_log_perror("Could not convert filename to Unicode:"
+ 					" '%s'", p);
+--- a/ntfs-3g/libntfs-3g/unistr.c
++++ b/ntfs-3g/libntfs-3g/unistr.c
+@@ -1634,8 +1634,128 @@
+ 				collapsible = FALSE;
+ 	}
+ 	return (collapsible);
++}
++
++/*
++ * ntfsoficial: troca de caracteres do SFM (Services for Macintosh), igual ao driver do Tuxera (REA: FUN_100046e80
++ * Mac->disco e FUN_100046f50 disco->Mac). Os caracteres que o Windows não aceita em nomes (e o Mac usa) são
++ * guardados no NTFS na área de uso privado U+F0xx:
++ *   0x01..0x1F <-> U+F001..U+F01F     '"' <-> U+F020    '*' <-> U+F021    ':' <-> U+F022
++ *   '<' <-> U+F023   '>' <-> U+F024    '?' <-> U+F025    '\' <-> U+F026    '|' <-> U+F027
++ *   U+F8FF (maçã da Apple) <-> U+F02A
++ * A troca é simétrica (a mesma tabela nos dois sentidos). Além dela, só no sentido Mac->disco um nome que TERMINA em
++ * '.' ou ' ' termina em U+F029 ou U+F028 (o Windows não aceita ponto/espaço no fim); no sentido disco->Mac,
++ * U+F029/U+F028 no fim voltam a '.' e ' '. "." e ".." nunca são trocados.
++ * Desligado por padrão (só com a opção sfmconv).
++ */
++static int sfmconv_ligado = 0;
++
++int ntfs_name_sfmconv(int ligado)
++{
++	sfmconv_ligado = ligado ? 1 : 0;
++	return 0;
++}
++
++static const struct { u16 mac; u16 disco; } sfm_pares[] = {
++	{ 0x0022, 0xf020 }, { 0x002a, 0xf021 }, { 0x003a, 0xf022 },
++	{ 0x003c, 0xf023 }, { 0x003e, 0xf024 }, { 0x003f, 0xf025 },
++	{ 0x005c, 0xf026 }, { 0x007c, 0xf027 }, { 0xf8ff, 0xf02a }
++};
++
++/* troca simétrica de um caractere (vale nos dois sentidos) */
++static u16 sfm_troca(u16 c)
++{
++	unsigned int i;
++
++	if ((c >= 0x0001) && (c <= 0x001f))
++		return (u16)(c + 0xf000);
++	if ((c >= 0xf001) && (c <= 0xf01f))
++		return (u16)(c - 0xf000);
++	for (i = 0; i < sizeof(sfm_pares)/sizeof(sfm_pares[0]); i++) {
++		if (c == sfm_pares[i].mac)
++			return sfm_pares[i].disco;
++		if (c == sfm_pares[i].disco)
++			return sfm_pares[i].mac;
++	}
++	return c;
++}
++
++static BOOL sfm_nome_especial(const ntfschar *nome, int len)
++{
++	return (len == 1 && le16_to_cpu(nome[0]) == '.')
++	    || (len == 2 && le16_to_cpu(nome[0]) == '.'
++			 && le16_to_cpu(nome[1]) == '.');
++}
++
++/* Mac -> disco, no lugar */
++static void sfm_para_disco(ntfschar *nome, int len)
++{
++	int i;
++	u16 ultimo;
++
++	if (len <= 0 || sfm_nome_especial(nome, len))
++		return;
++	ultimo = le16_to_cpu(nome[len - 1]);	/* o ORIGINAL, antes da troca */
++	for (i = 0; i < len; i++)
++		nome[i] = cpu_to_le16(sfm_troca(le16_to_cpu(nome[i])));
++	if (ultimo == '.')
++		nome[len - 1] = cpu_to_le16(0xf029);
++	else if (ultimo == ' ')
++		nome[len - 1] = cpu_to_le16(0xf028);
+ }
+ 
++/* disco -> Mac, no lugar */
++static void sfm_para_mac(ntfschar *nome, int len)
++{
++	int i;
++	u16 ultimo;
++
++	if (len <= 0)
++		return;
++	ultimo = le16_to_cpu(nome[len - 1]);
++	for (i = 0; i < len; i++)
++		nome[i] = cpu_to_le16(sfm_troca(le16_to_cpu(nome[i])));
++	if (ultimo == 0xf029)
++		nome[len - 1] = cpu_to_le16('.');
++	else if (ultimo == 0xf028)
++		nome[len - 1] = cpu_to_le16(' ');
++}
++
++/* nome do Mac (UTF-8) -> nome NTFS (UTF-16), com a troca do SFM se ligada; mesma devolução de ntfs_mbstoucs() */
++int ntfs_mbstoucs_name(const char *ins, ntfschar **outs)
++{
++	int len;
++
++	len = ntfs_mbstoucs(ins, outs);
++	if (sfmconv_ligado && len > 0 && *outs)
++		sfm_para_disco(*outs, len);
++	return len;
++}
++
++/* nome NTFS (UTF-16) -> nome do Mac (UTF-8), com a troca do SFM se ligada; mesma devolução de ntfs_ucstombs() */
++int ntfs_ucstombs_name(const ntfschar *ins, const int ins_len, char **outs,
++		int outs_len)
++{
++	ntfschar *copia;
++	int len, res;
++
++	if (!sfmconv_ligado || !ins || ins_len <= 0)
++		return ntfs_ucstombs(ins, ins_len, outs, outs_len);
++	copia = (ntfschar*)malloc(ins_len * sizeof(ntfschar));
++	if (!copia) {
++		errno = ENOMEM;
++		return -1;
++	}
++	memcpy(copia, ins, ins_len * sizeof(ntfschar));
++	/* a conversão pára no primeiro NUL: a troca vale só até lá */
++	for (len = 0; len < ins_len && copia[len]; len++)
++		;
++	sfm_para_mac(copia, len);
++	res = ntfs_ucstombs(copia, ins_len, outs, outs_len);
++	free(copia);
++	return res;
++}
++
+ /*
+  * Define the character encoding to be used.
+  * Use UTF-8 unless specified otherwise.
+--- a/ntfs-3g/src/lowntfs-3g.c
++++ b/ntfs-3g/src/lowntfs-3g.c
+@@ -268,7 +268,7 @@
+ "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
+ "\n"
+ "Options:  ro (read-only mount), windows_names, uid=, gid=,\n" 
+-"          umask=, fmask=, dmask=, streams_interface=.\n"
++"          umask=, fmask=, dmask=, streams_interface=, sfmconv.\n"
+ "          Please see the details in the manual (type: man ntfs-3g).\n"
+ "\n"
+ "Example: lowntfs-3g /dev/sda1 /mnt/windows\n"
+@@ -1282,7 +1282,7 @@
+ 	if (name_type == FILE_NAME_DOS)
+ 		return 0;
+         
+-	if ((filenamelen = ntfs_ucstombs(name, name_len, &filename, 0)) < 0) {
++	if ((filenamelen = ntfs_ucstombs_name(name, name_len, &filename, 0)) < 0) {
+ 		ntfs_log_perror("Filename decoding failed (inode %llu)",
+ 				(unsigned long long)MREF(mref));
+ 		return -1;
+@@ -2524,7 +2524,7 @@
+ 	int res = 0, uname_len, utarget_len;
+ 
+ 	/* Generate unicode filename. */
+-	uname_len = ntfs_mbstoucs(name, &uname);
++	uname_len = ntfs_mbstoucs_name(name, &uname);
+ 	if ((uname_len < 0)
+ 	    || (ctx->windows_names
+ 		&& ntfs_forbidden_names(ctx->vol,uname,uname_len,TRUE))) {
+@@ -2773,7 +2773,7 @@
+ 		goto exit;
+ 	}
+ 	/* Generate unicode filename. */
+-	uname_len = ntfs_mbstoucs(newname, &uname);
++	uname_len = ntfs_mbstoucs_name(newname, &uname);
+ 	if ((uname_len < 0)
+             || (ctx->windows_names
+                 && ntfs_forbidden_names(ctx->vol,uname,uname_len,TRUE))) {
+@@ -2885,7 +2885,7 @@
+ 		goto exit;
+ 	}
+ 	/* Generate unicode filename. */
+-	uname_len = ntfs_mbstoucs(name, &uname);
++	uname_len = ntfs_mbstoucs_name(name, &uname);
+ 	if (uname_len < 0) {
+ 		res = -errno;
+ 		goto exit;
+--- a/ntfs-3g/src/ntfs-3g_common.c
++++ b/ntfs-3g/src/ntfs-3g_common.c
+@@ -113,6 +113,8 @@
+ 	{ "locale", OPT_LOCALE, FLGOPT_STRING },
+ 	{ "nfconv", OPT_NFCONV, FLGOPT_BOGUS },
+ 	{ "nonfconv", OPT_NONFCONV, FLGOPT_BOGUS },
++	{ "sfmconv", OPT_SFMCONV, FLGOPT_BOGUS },
++	{ "nosfmconv", OPT_NOSFMCONV, FLGOPT_BOGUS },
+ 	{ "streams_interface", OPT_STREAMS_INTERFACE, FLGOPT_STRING },
+ 	{ "user_xattr", OPT_USER_XATTR, FLGOPT_BOGUS },
+ 	{ "noauto", OPT_NOAUTO, FLGOPT_BOGUS },
+@@ -474,6 +476,16 @@
+ 				break;
+ #endif /* ENABLE_NFCONV */
+ #endif /* defined(__APPLE__) || defined(__DARWIN__) */
++			/*
++			 * ntfsoficial: troca de caracteres do SFM nos nomes de arquivo (ver unistr.c). Fora do bloco
++			 * do macOS porque a libntfs-3g a oferece em qualquer sistema; padrão: desligada.
++			 */
++			case OPT_SFMCONV :
++				ntfs_name_sfmconv(1);
++				break;
++			case OPT_NOSFMCONV :
++				ntfs_name_sfmconv(0);
++				break;
+ 			case OPT_STREAMS_INTERFACE :
+ 				if (!strcmp(val, "none"))
+ 					ctx->streams = NF_STREAMS_INTERFACE_NONE;
+--- a/ntfs-3g/src/ntfs-3g_common.h
++++ b/ntfs-3g/src/ntfs-3g_common.h
+@@ -79,6 +79,8 @@
+ 	OPT_LOCALE,
+ 	OPT_NFCONV,
+ 	OPT_NONFCONV,
++	OPT_SFMCONV,
++	OPT_NOSFMCONV,
+ 	OPT_STREAMS_INTERFACE,
+ 	OPT_USER_XATTR,
+ 	OPT_NOAUTO,

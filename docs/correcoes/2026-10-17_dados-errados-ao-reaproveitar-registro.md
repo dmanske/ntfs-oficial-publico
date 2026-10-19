@@ -16,7 +16,10 @@ Acontecia também com o driver que estava instalado (modo bloco, síncrono), ou 
   vnodes pelo número; com o mesmo número e a mesma geração, entregava o vnode velho, com tamanho e cache antigos.
 - O kext do Tuxera tem o mesmo comportamento (REA: na mudança de geração descarta e devolve `ESTALE` = 0x46 em
   `sub_9988`; `vnode_recycle` só na rotina de "desaparecer", `sub_5430`). O driver do Tuxera não deixa nomes de
-  função nessa parte; deduzimos que ele entrega números/gerações distintos.
+  função nessa parte; deduzimos que ele entrega números/gerações distintos. *Conferido com o Ghidra em 18/10/2026
+  (lookup FUN_10000b240): o número entregue é só o do registro MFT, sem a sequência; só a geração muda (= número de
+  sequência). A solução dele depende do ESTALE do kext; a nossa (0003 + 0004) muda também o número, e o teste de
+  estresse mostra que funciona. Diferença visível: o nosso `st_ino` fica acima de 2^48.*
 
 ## Correção (patches do driver)
 

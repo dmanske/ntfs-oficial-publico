@@ -1,0 +1,20 @@
+--- a/kext/osxfuse/fuse_vfsops.c	2026-10-18 22:19:43
++++ b/kext/osxfuse/fuse_vfsops.c	2026-10-18 22:19:43
+@@ -902,12 +902,15 @@
+     }
+ 
+     /*
++     * ntfsoficial: anuncia "renomear volume" quando o driver implementa o setvolname (o INIT traz
++     * FUSE_VOL_RENAME; patch 0007 do driver). Sem isso o setattrlist(ATTR_VOL_NAME) do Finder e do
++     * DiskArbitration volta EINVAL antes de chegar ao fuse_vfsop_setattr, que já trata o f_vol_name e manda
++     * FUSE_SETVOLNAME ao driver. No osxfuse 3 estava comentado ("Not yet"); visto em 18/10/2026.
++     */
+     if (fuse_implemented(data, FSESS_NOIMPLBIT(SETVOLNAME))) {
+         attr->f_capabilities.capabilities[VOL_CAPABILITIES_INTERFACES] |=
+             VOL_CAP_INT_VOL_RENAME;
+     }
+-    */
+-    /* Not yet. */
+ 
+     if (data->dataflags & FSESS_XTIMES) {
+         attr->f_attributes.validattr.commonattr |=

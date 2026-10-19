@@ -88,7 +88,7 @@ universal() {  # universal <caminho relativo ao src-<arq>> <nome de saída>
     lipo -create "${entradas[@]}" -output "${SAIDA}/bin/$2"
 }
 universal ntfs-3g/src/lowntfs-3g "${NOME}"
-for f in mkntfs ntfsfix ntfslabel ntfsls ntfsinfo; do universal "ntfs-3g/ntfsprogs/${f}" "${f}"; done
+for f in mkntfs ntfsfix ntfslabel ntfsls ntfsinfo ntfsrecover; do universal "ntfs-3g/ntfsprogs/${f}" "${f}"; done
 universal ntfs-3g/src/ntfs-3g.probe ntfs-3g.probe
 cp "${SAIDA}/support/Release/load_${NOME}" "${SAIDA}/support/Release/mount_${NOME}" "${SAIDA}/bin/"
 # lipo invalida a assinatura: assinar de novo, sempre depois de juntar

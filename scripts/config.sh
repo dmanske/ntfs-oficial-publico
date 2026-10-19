@@ -7,7 +7,14 @@ NOME="ntfsoficial"
 NOME_EXIBICAO="NTFSOficial"
 # Prefixo dos identificadores (kext: ${IDENTIFICADOR}.filesystems.${NOME})
 IDENTIFICADOR="com.danielmanske.ntfsoficial"
-VERSAO="0.1.1"
+VERSAO="0.2.0"
+# Versão do kext: vai para o kext (sysctl version.number) e para o load_/mount_ntfsoficial, que recusam montar se
+# ela for diferente da do kext carregado ("mismatched version"). Só mude quando o código do kext mudar: kext novo
+# exige aprovar em Ajustes e reiniciar, e o instalar.sh mantém o kext já aprovado. Separada da VERSAO desde
+# 18/10/2026: a 0.1.1 subiu a versão de tudo, ficou o kext aprovado 0.1.0 e nenhum disco montava.
+#   0.1.0  kext da fase 0 (patches 0001-0004)
+#   0.1.1  + 0005: anuncia "renomear volume" (18/10/2026)
+VERSAO_KEXT="0.1.1"
 
 # Onde o pacote fica instalado
 PACOTE_FS="/Library/Filesystems/${NOME}.fs"
@@ -19,6 +26,10 @@ PREFERENCIAS="/Library/Preferences/${IDENTIFICADOR}.plist"
 #   Tuxera:        440, 440, 3440
 ORDEM_NTFS=400
 ORDEM_DISCO_INTEIRO=3400
+# Partição marcada como FAT que na verdade é NTFS (o Windows monta assim). Apple FAT: 1000; Tuxera: 1940.
+# Com 1900 a Apple (FAT de verdade) ainda ganha das partições FAT autênticas no nosso detector, que confere a
+# assinatura "NTFS    " antes de tudo e recusa FAT rápido; só pegamos o que a Apple recusou.
+ORDEM_FAT=1900
 
 # Compilação
 # Binário universal (Mac Intel + Apple Silicon). Listas separadas por espaço.

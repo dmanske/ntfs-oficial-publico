@@ -5,9 +5,10 @@
  *   1. preferência DisableDriver -> não reconhece;
  *   2. (nosso) assinatura "NTFS    " no setor de boot: responde rápido "não é meu" para FAT/exFAT,
  *      que usam o mesmo tipo de partição GPT (EBD0A0A2-...);
- *   3. ntfs-3g.probe -> 0 ou 14 (hibernado) seguem; o resto (inclusive 15, desmontado sujo) não reconhece
- *      e fica para o NTFS só leitura da Apple. O Tuxera também aceita o 13 (corrompido); nós não, porque a
- *      montagem falharia e o disco nem apareceria;
+ *   3. ntfs-3g.probe -> 0, 14 (hibernado ou journal 2.0) e 15 (desmontado sujo) seguem, como o Tuxera (REA:
+ *      _op_probe aceita `código - 14 < 2`, ou seja, 14 e 15). O 13 (corrompido) é recusado, igual ao Tuxera, e
+ *      fica para o NTFS só leitura da Apple. Em 14/15 a montagem decide o que fazer (montar.c: replay do
+ *      journal com o ntfsrecover ou só leitura);
  *   4. arquivo de controle disable-driver no disco -> não reconhece;
  *   5. escreve o rótulo do volume e responde RECONHECIDO.
  */
@@ -59,7 +60,7 @@ int detectar(int argc, char *argv[])
     char *probe[] = { PROBE_NTFS3G, so_leitura ? "--readonly" : "--readwrite", dispositivo, NULL };
     int r = executar(probe, saida, sizeof(saida));
     registro("detectar %s: ntfs-3g.probe = %d", dispositivo, r);
-    if (r != NTFS_OK && r != NTFS_HIBERNADO) {
+    if (r != NTFS_OK && r != NTFS_HIBERNADO && r != NTFS_DESMONTAGEM_SUJA) {
         registro("detectar %s: não reconhecido (código %d): %s", dispositivo, r, saida);
         return RESPOSTA_NAO_RECONHECIDO;
     }

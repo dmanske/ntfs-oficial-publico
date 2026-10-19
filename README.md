@@ -51,8 +51,21 @@ Desinstalar: dois cliques em
 - **Detecção e montagem automática:** um pacote em `/Library/Filesystems/ntfsoficial.fs`, que o macOS consulta
   antes do NTFS dele (que só lê).
 - **App:** SwiftUI, na barra de menus.
+- **Disco que o Windows deixou sujo** (tirado sem "remover com segurança"): o journal do Windows é reaplicado com o
+  `ntfsrecover` do NTFS-3G e o disco monta com gravação; se não der, monta só para leitura e avisa.
+- **Finder:** arquivos ocultos do Windows ficam escondidos, "somente leitura" vira o cadeado, data de criação, renomear
+  o volume. Nomes com `" * : < > ? \ |` são gravados no formato SFM (o mesmo do compartilhamento SMB do macOS).
+- **Utilitário de Disco:** Primeiros Socorros (verificar/reparar) e Apagar como "NTFS Oficial".
 
 Detalhes em [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) e [`docs/modulos/`](docs/modulos/).
+
+## Versões
+
+| Versão | Data | O que mudou |
+|---|---|---|
+| 0.2.0 | 18/10/2026 | Disco sujo do Windows montado com gravação; Finder (ocultos, cadeado, data de criação, renomear volume); nomes SFM; Utilitário de Disco; correções (nada montava depois da 0.1.1; disco com espaço no nome não era desmontado ao desligar). Kext 0.1.1: precisa aprovar de novo e reiniciar |
+| 0.1.1 | 17/10/2026 | App não some mais em segundo plano |
+| 0.1.0 | 17/10/2026 | Primeira versão |
 
 ## Compilar
 

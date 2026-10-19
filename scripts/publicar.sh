@@ -18,6 +18,8 @@ FORA_DO_PUBLICO=(
     .kiro
     publico                # vira a raiz do público (README, LICENSE)
     scripts/rea-trabalhador.command
+    scripts/engenharia-reversa            # exportação do Tuxera com o Ghidra
+    docs/operacao/ENGENHARIA_REVERSA.md   # como analisar o Tuxera
     scripts/prova-fase0.sh # mexe nas preferências do Tuxera deste Mac
 )
 CRIAR_RELEASE=0

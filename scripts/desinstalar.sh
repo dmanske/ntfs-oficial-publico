@@ -8,7 +8,8 @@ ID_KEXT="${IDENTIFICADOR}.filesystems.${NOME}"
 SERVICO="${IDENTIFICADOR}.desmontar"
 
 echo "==> Desmontando volumes ${NOME}"
-/sbin/mount -t "${NOME}" | while read -r _ _ ponto _; do diskutil unmount "${ponto}" || true; done
+# 1º campo da linha do mount = dispositivo (nunca tem espaço); o ponto de montagem pode ter ("/Volumes/Meu Disco")
+/sbin/mount -t "${NOME}" | while IFS= read -r linha; do diskutil unmount "${linha%% on *}" || true; done
 echo "==> App"
 pkill -x NTFSOficial 2>/dev/null || true
 [ -d "/Applications/NTFS Oficial.app" ] && sudo rm -rf "/Applications/NTFS Oficial.app"

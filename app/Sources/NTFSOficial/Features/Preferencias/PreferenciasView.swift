@@ -124,6 +124,8 @@ struct PreferenciasView: View {
                     .labelsHidden().toggleStyle(.switch)
             }
             Divider().padding(.leading, 16)
+            interruptor(.prefSFM, desc: .prefSFMDesc, valor: $rascunho.enableSFMConversions)
+            Divider().padding(.leading, 16)
             LinhaAjuste(Texto.t(.prefXattr), descricao: Texto.t(.ajXattrDesc)) {
                 Picker("", selection: $rascunho.xattrMode) {
                     Text(Texto.t(.xattrTudo)).tag(2)

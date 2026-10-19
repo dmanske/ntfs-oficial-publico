@@ -4,9 +4,14 @@
  *
  * Opções passadas ao driver, como o _op_mount do Tuxera (REA):
  *   local, iosize (1 MiB), uid/gid da pessoa, nfconv conforme preferência e arquivo de controle,
- *   modo de xattr (XattrMode), recover/norecover (EnableAutomaticRecovery), volname.
- * Diferença do Tuxera: hibernado (14) ou desmontado sujo (15) não abre janela de "forçar" (que apaga a
- * hibernação); monta só para leitura e avisa. Nada de remove_hiberfile automático.
+ *   modo de xattr (XattrMode), sfmconv/nosfmconv (EnableSFMConversions), volname.
+ *
+ * Disco sujo (probe 14/15): com EnableAutomaticRecovery (padrão 1, como o Tuxera) roda o ntfsrecover, que
+ * reaplica o journal do Windows, e monta com gravação. O driver sempre recebe `norecover`: a opção `recover`
+ * do NTFS-3G só zera o journal (descarta as transações), então nunca é usada; depois do replay o journal já
+ * está limpo (recuperar.c). Se o replay falhar, for cache do Windows (journal 2.0) ou hibernação de verdade:
+ * monta só para leitura e avisa. Diferença do Tuxera: nada de janela de "forçar" (que apaga a hibernação) nem
+ * de remove_hiberfile automático.
  */
 #include "comum.h"
 
@@ -64,17 +69,25 @@ static void montar_opcoes(char *o, const preferencias_t *p, const controle_t *c,
     snprintf(item, sizeof(item), "iosize=%ld", p->iosize); juntar(o, item);
     snprintf(item, sizeof(item), "uid=%u,gid=%u", uid, gid); juntar(o, item);
     if (geteuid() == 0) juntar(o, "allow_other");   /* montado pelo sistema: a pessoa precisa acessar */
-    juntar(o, "windows_names");                     /* não deixa criar nomes que o Windows recusa */
+    /* Nomes com : * ? " < > | e afins. O Tuxera usa o estilo SFM (Services for Macintosh: grava U+F021... no
+     * lugar) e NÃO passa windows_names (REA); sem SFM, windows_names recusa criar esses nomes. */
+    if (p->sfm) {
+        juntar(o, "sfmconv");
+    } else {
+        juntar(o, "nosfmconv");
+        juntar(o, "windows_names");
+    }
     juntar(o, (p->normalizacao && !c->sem_normalizacao) ? "nfconv" : "nonfconv");
     switch (p->modo_xattr) {
         case 0:  juntar(o, "streams_interface=none,noapplexattr,noappledouble"); break;
         case 1:  juntar(o, "streams_interface=none,auto_xattr"); break;
         default: juntar(o, "streams_interface=openxattr,native_xattr"); break;
     }
-    juntar(o, p->recuperacao ? "recover" : "norecover");
+    juntar(o, "norecover");                         /* o replay é feito antes, pelo ntfsrecover (ver acima) */
     /* Sem isto o kext do osxfuse monta síncrono (fuse_vfsops.c: sem FUSE_MOPT_NO_SYNCWRITES liga
      * MNT_SYNCHRONOUS): cada gravação espera o disco, 21 MB/s no SSD USB (17/10/2026). O kext do Tuxera
-     * monta assíncrono sem precisar de opção (REA: vfs_clearflags 0x2 + vfs_setflags 0x40 em 0xad2c). */
+     * também monta SÍNCRONO: o ramo assíncrono dele exige nosyncwrites, que nenhum programa do Tuxera passa
+     * (REA). O nosso monta assíncrono por escolha, pelo desempenho (docs/modulos/desempenho.md). */
     if (p->cache && !c->sem_cache) juntar(o, "nosyncwrites");
 
     char copia[1024];
@@ -101,8 +114,6 @@ static bool esperar_montado(const char *ponto, int segundos)
     return false;
 }
 
-/* Avisa por que o disco ficou só para leitura. hibernado = true: Windows hibernado/inicialização rápida;
- * false: desmontado sujo (journal pendente). */
 /* Guarda o motivo do "só leitura" para o app NTFS Oficial mostrar (contrato:
  * ESTADO_DIR/<disco>.motivo com "hibernado" ou "sujo"; sem arquivo = montado normalmente). */
 #define ESTADO_DIR "/private/var/tmp/" NOME
@@ -120,24 +131,82 @@ static void gravar_motivo(const char *dispositivo, const char *motivo)
     if (f) { fputs(motivo, f); fclose(f); chmod(caminho, 0644); }
 }
 
-static void avisar_so_leitura(const char *ponto, bool hibernado)
+/* Por que o disco ficou só para leitura (muda só o texto do aviso; o app lê "hibernado" ou "sujo"). */
+typedef enum {
+    MOTIVO_HIBERNADO,          /* Windows hibernado / inicialização rápida (hiberfil.sys) */
+    MOTIVO_SUJO,               /* journal pendente e a recuperação automática está desligada */
+    MOTIVO_RECUPERACAO_FALHOU  /* tentamos reaplicar o journal e não deu (ou é cache do Windows) */
+} motivo_t;
+
+static void avisar_so_leitura(const char *ponto, motivo_t motivo)
 {
     char copia[1024], msg[1024];
     strlcpy(copia, ponto, sizeof(copia));
-    snprintf(msg, sizeof(msg),
-        hibernado
-        ? "O disco \"%s\" está com o Windows hibernado (ou com a \"Inicialização rápida\" ligada).\n\n"
-          "Ele foi montado só para leitura, para não perder dados. Para gravar: no Windows, desligue "
-          "a Inicialização rápida e use Desligar (não Hibernar)."
-        : "O disco \"%s\" não foi desconectado direito da última vez.\n\n"
-          "Ele foi montado só para leitura, para não piorar. Para gravar: conecte num Windows e rode "
-          "\"chkdsk /f\", ou ejete com segurança antes de tirar o cabo.",
-        basename(copia));
+    const char *formato;
+    switch (motivo) {
+        case MOTIVO_HIBERNADO:
+            formato = "O disco \"%s\" está com o Windows hibernado (ou com a \"Inicialização rápida\" ligada).\n\n"
+                      "Ele foi montado só para leitura, para não perder dados. Para gravar: no Windows, desligue "
+                      "a Inicialização rápida e use Desligar (não Hibernar).";
+            break;
+        case MOTIVO_RECUPERACAO_FALHOU:
+            formato = "O disco \"%s\" não foi desconectado direito da última vez e não consegui recuperar as "
+                      "alterações pendentes do Windows (ou elas estão no cache da Inicialização rápida).\n\n"
+                      "Ele foi montado só para leitura, para não piorar. Para gravar: conecte num Windows e rode "
+                      "\"chkdsk /f\", ou ejete com segurança antes de tirar o cabo.";
+            break;
+        default:
+            formato = "O disco \"%s\" não foi desconectado direito da última vez.\n\n"
+                      "Ele foi montado só para leitura, para não piorar. Para gravar: ligue a recuperação "
+                      "automática nas preferências do NTFS Oficial, ou conecte num Windows e rode \"chkdsk /f\".";
+            break;
+    }
+    snprintf(msg, sizeof(msg), formato, basename(copia));
     aviso_mostrar("NTFS Oficial: montado só para leitura", msg);
 }
 
+/* Antes de montar com gravação: o disco está sujo? Se estiver e a recuperação automática estiver ligada,
+ * reaplica o journal. Devolve true se pode montar com gravação; false (e o motivo) se tem que ser só leitura.
+ * O Tuxera faz o replay dentro do próprio driver; aqui o NTFS-3G recusa disco sujo, então o ntfsrecover roda
+ * antes (recuperar.c explica os códigos). Nunca se passa `recover` ao driver sem o replay ter dado certo. */
+static bool preparar_gravacao(const char *dispositivo, const preferencias_t *p, motivo_t *motivo)
+{
+    char saida[1024];
+    int codigo = 0;
+    sujeira_t s = recuperar_classificar(dispositivo, &codigo, saida, sizeof(saida));
+    if (s == SUJEIRA_NENHUMA) return true;       /* 0, ou erro que o próprio driver vai explicar */
+
+    registro("montar %s: probe = %d (%s)", dispositivo, codigo,
+             s == SUJEIRA_HIBERNADO ? "hibernado" : s == SUJEIRA_JOURNAL ? "journal sujo" : "cache do Windows");
+    if (s == SUJEIRA_HIBERNADO) {
+        *motivo = MOTIVO_HIBERNADO;              /* nunca mexe no journal de um Windows hibernado */
+        return false;
+    }
+    if (!p->recuperacao) {
+        registro("montar %s: EnableAutomaticRecovery desligado, só leitura", dispositivo);
+        *motivo = MOTIVO_SUJO;
+        return false;
+    }
+    char rec[1024];
+    int r = recuperar_journal(dispositivo, false, rec, sizeof(rec));
+    if (r != 0) {
+        registro_erro("montar %s: o replay do journal falhou (ntfsrecover = %d): %s", dispositivo, r, rec);
+        *motivo = MOTIVO_RECUPERACAO_FALHOU;
+        return false;
+    }
+    /* Confere: o journal tem que ter ficado limpo, senão o driver cairia para só leitura de novo */
+    if (recuperar_classificar(dispositivo, &codigo, saida, sizeof(saida)) != SUJEIRA_NENHUMA || codigo != 0) {
+        registro_erro("montar %s: depois do replay o probe ainda diz %d: %s", dispositivo, codigo, saida);
+        *motivo = MOTIVO_RECUPERACAO_FALHOU;
+        return false;
+    }
+    registro("montar %s: journal do Windows reaplicado, montando com gravação", dispositivo);
+    return true;
+}
+
 /* O NTFS-3G cai para só leitura sozinho (e devolve 0) quando o disco está hibernado ou sujo, escrevendo
- * "Falling back to read-only" (visto em 17/10/2026). Detecta isso pelo volume montado + texto do driver. */
+ * "Falling back to read-only" (visto em 17/10/2026). Detecta isso pelo volume montado. Agora é rede de
+ * segurança: preparar_gravacao() já separa esses casos antes de chamar o driver. */
 static bool caiu_para_so_leitura(const char *ponto)
 {
     struct statfs s;
@@ -188,6 +257,14 @@ int montar(int argc, char *argv[])
     controle_t c;
     controle_ler(dispositivo, &c);
 
+    /* Disco sujo/hibernado: reaplica o journal se der; senão a montagem sai só para leitura */
+    motivo_t motivo = MOTIVO_SUJO;
+    bool forcado_so_leitura = false;
+    if (!so_leitura && !preparar_gravacao(dispositivo, &p, &motivo)) {
+        so_leitura = true;
+        forcado_so_leitura = true;
+    }
+
     char opcoes[MAX_OPCOES], saida[4096];
     montar_opcoes(opcoes, &p, &c, ponto, sistema, so_leitura);
     int r = rodar_driver(dispositivo, ponto, opcoes, saida, sizeof(saida));
@@ -196,9 +273,9 @@ int montar(int argc, char *argv[])
         registro("montar %s: código %d, montando só para leitura", dispositivo, r);
         montar_opcoes(opcoes, &p, &c, ponto, sistema, true);
         int r2 = rodar_driver(dispositivo, ponto, opcoes, saida, sizeof(saida));
-        if (r2 == 0 && esperar_montado(ponto, 10)) {
+        if (r2 == 0 && esperar_montado(ponto, ESPERA_MONTAGEM_SEGUNDOS)) {
             gravar_motivo(dispositivo, r == NTFS_HIBERNADO ? "hibernado" : "sujo");
-            avisar_so_leitura(ponto, r == NTFS_HIBERNADO);
+            avisar_so_leitura(ponto, r == NTFS_HIBERNADO ? MOTIVO_HIBERNADO : MOTIVO_SUJO);
             return 0;
         }
         r = r2;
@@ -208,18 +285,26 @@ int montar(int argc, char *argv[])
         fprintf(stderr, "%s", saida);
         return r > 0 ? r : 1;
     }
-    if (!esperar_montado(ponto, 10)) {
-        registro_erro("montar %s em %s: o driver retornou 0 mas o volume não apareceu em 10 s. Saída: %s",
-                      dispositivo, ponto, saida);
+    if (!esperar_montado(ponto, ESPERA_MONTAGEM_SEGUNDOS)) {
+        registro_erro("montar %s em %s: o driver retornou 0 mas o volume não apareceu em %d s. Saída: %s",
+                      dispositivo, ponto, ESPERA_MONTAGEM_SEGUNDOS, saida);
         fprintf(stderr, "%s", saida);
         return 1;
     }
+    if (forcado_so_leitura) {
+        registro("montar %s em %s: montado só para leitura (%s)", dispositivo, ponto,
+                 motivo == MOTIVO_HIBERNADO ? "hibernado" : "disco sujo");
+        gravar_motivo(dispositivo, motivo == MOTIVO_HIBERNADO ? "hibernado" : "sujo");
+        avisar_so_leitura(ponto, motivo);
+        return 0;
+    }
     if (!so_leitura && caiu_para_so_leitura(ponto)) {
-        bool hibernado = strcasestr(saida, "hibernat") != NULL;
+        /* "Windows is hibernated" é a mensagem do hiberfil.sys; o aviso de queda diz "hibernation", outra coisa */
+        bool hibernado = strcasestr(saida, "hibernated") != NULL;
         registro("montar %s em %s: o driver caiu para só leitura (%s)", dispositivo, ponto,
                  hibernado ? "hibernado" : "desmontado sujo");
         gravar_motivo(dispositivo, hibernado ? "hibernado" : "sujo");
-        avisar_so_leitura(ponto, hibernado);
+        avisar_so_leitura(ponto, hibernado ? MOTIVO_HIBERNADO : MOTIVO_SUJO);
         return 0;
     }
     gravar_motivo(dispositivo, NULL);

@@ -1,10 +1,17 @@
 #!/bin/bash
 # Testa os casos especiais da montagem automática com discos de teste (nada de disco real), sem sudo:
-#   hibernado  -> NTFS Oficial monta SÓ LEITURA e mostra o aviso "montado só para leitura"
-#   sujo       -> idem (journal pendente; com EnableAutomaticRecovery = 0, o padrão)
-#   controle   -> /.NTFS-Oficial/disable-driver: o disco fica para o NTFS só leitura da Apple
+#   hibernado    -> NTFS Oficial monta SÓ LEITURA e mostra o aviso "montado só para leitura" (nunca mexe no journal)
+#   sujo         -> journal corrompido (restart page com bytes aleatórios): o ntfsrecover falha, o disco não é
+#                   alterado e monta SÓ LEITURA (EnableAutomaticRecovery = 1, o padrão)
+#   cache        -> journal versão 2.0 (metadados no cache da Inicialização rápida): o ntfsrecover recusa sem -k
+#                   (que perderia dados), então SÓ LEITURA
+#   recuperavel  -> journal sujo mas íntegro (scripts/criar-journal-sujo.py): o ntfsrecover reaplica, o journal
+#                   fica limpo e o disco monta COM GRAVAÇÃO, sem a opção `recover` do driver
+#   controle     -> /.NTFS-Oficial/disable-driver: o disco fica para o NTFS só leitura da Apple
 # Cada disco é anexado como um HD plugado (o macOS decide quem monta) e depois ejetado.
-# Atenção: nos dois primeiros aparece a janela de aviso na tela (clicar OK).
+# Atenção: nos que montam só leitura aparece a janela de aviso na tela (clicar OK).
+# Precisa do pacote instalado (scripts/instalar.sh): a montagem passa pelo DiskArbitration.
+# Pressupõe o $LogFile de 2 MiB que o mkntfs cria numa imagem de 100 MB (o criar-journal-sujo.py confere os bits).
 set -euo pipefail
 source "$(dirname "$0")/config.sh"
 
@@ -32,13 +39,24 @@ LCN="$("${SAIDA}/bin/ntfsinfo" -v -F '$LogFile' "$P" 2>/dev/null | awk '/Runlist
 python3 -I -c "import os,sys; f=os.open(sys.argv[1],os.O_RDWR); os.pwrite(f,b'RSTR'+os.urandom(8188),int(sys.argv[2],16)*4096); os.close(f)" "$P" "$LCN"
 hdiutil detach -quiet "${P%s*}"
 
+LOG_TAM=2097152
+P="$(criar recuperavel "TESTE RECUPERAVEL")"
+LCN="$("${SAIDA}/bin/ntfsinfo" -v -F '$LogFile' "$P" 2>/dev/null | awk '/Runlist/ {getline; if (!achou) {print $2; achou = 1}}')"
+python3 -I "${RAIZ}/scripts/criar-journal-sujo.py" "$P" "$((LCN * 4096))" "${LOG_TAM}"
+hdiutil detach -quiet "${P%s*}"
+
+P="$(criar cache "TESTE CACHE")"
+LCN="$("${SAIDA}/bin/ntfsinfo" -v -F '$LogFile' "$P" 2>/dev/null | awk '/Runlist/ {getline; if (!achou) {print $2; achou = 1}}')"
+python3 -I "${RAIZ}/scripts/criar-journal-sujo.py" "$P" "$((LCN * 4096))" "${LOG_TAM}" 2.0
+hdiutil detach -quiet "${P%s*}"
+
 P="$(criar controle "TESTE CONTROLE")"
 com_volume "$P" "import sys,os; os.makedirs(os.path.join(sys.argv[1],'.NTFS-Oficial')); open(os.path.join(sys.argv[1],'.NTFS-Oficial','disable-driver'),'w').close()"
 hdiutil detach -quiet "${P%s*}"
 
 FALHAS=0
-for caso in "hibernado:${NOME}:ro" "sujo:${NOME}:ro" "controle:ntfs:ro"; do
-    IFS=: read -r nome tipo_esperado modo <<< "${caso}"
+for caso in "hibernado:${NOME}:nao" "sujo:${NOME}:nao" "cache:${NOME}:nao" "recuperavel:${NOME}:sim" "controle:ntfs:nao"; do
+    IFS=: read -r nome tipo_esperado grava_esperado <<< "${caso}"
     ROT="$(echo "TESTE ${nome}" | tr '[:lower:]' '[:upper:]')"; PONTO="/Volumes/${ROT}"
     INICIO="$(date '+%Y-%m-%d %H:%M:%S')"
     hdiutil attach "${T}/${nome}.dmg" > /dev/null 2>&1 || true
@@ -46,9 +64,11 @@ for caso in "hibernado:${NOME}:ro" "sujo:${NOME}:ro" "controle:ntfs:ro"; do
     LINHA="$(mount | grep "on ${PONTO} " || true)"
     TIPO="$(echo "${LINHA}" | sed -n 's/.*(\([^,]*\),.*/\1/p')"
     if echo x > "${PONTO}/t.txt" 2>/dev/null; then GRAVA="gravou"; else GRAVA="não gravou"; fi
-    AVISO="$(/usr/bin/log show --start "${INICIO}" --style compact --predicate "subsystem == \"${IDENTIFICADOR}\"" 2>/dev/null | grep -c 'caiu para só leitura\|montando só para leitura' || true)"
-    OK="ok"; { [ "${TIPO}" = "${tipo_esperado}" ] && [ "${GRAVA}" = "não gravou" ]; } || { OK="FALHOU"; FALHAS=$((FALHAS + 1)); }
-    echo "== ${nome}: montado por '${TIPO:-ninguém}' (esperado '${tipo_esperado}'), ${GRAVA}, aviso registrado: ${AVISO} -> ${OK}"
+    AVISO="$(/usr/bin/log show --start "${INICIO}" --style compact --predicate "subsystem == \"${IDENTIFICADOR}\"" 2>/dev/null | grep -c 'caiu para só leitura\|montado só para leitura' || true)"
+    REPLAY="$(/usr/bin/log show --start "${INICIO}" --style compact --predicate "subsystem == \"${IDENTIFICADOR}\"" 2>/dev/null | grep -c 'journal do Windows reaplicado' || true)"
+    esperado_grava="não gravou"; [ "${grava_esperado}" = "sim" ] && esperado_grava="gravou"
+    OK="ok"; { [ "${TIPO}" = "${tipo_esperado}" ] && [ "${GRAVA}" = "${esperado_grava}" ]; } || { OK="FALHOU"; FALHAS=$((FALHAS + 1)); }
+    echo "== ${nome}: montado por '${TIPO:-ninguém}' (esperado '${tipo_esperado}'), ${GRAVA} (esperado: ${esperado_grava}), aviso: ${AVISO}, replay do journal: ${REPLAY} -> ${OK}"
     DISCO="$(echo "${LINHA}" | awk '{print $1}')"
     [ -n "${DISCO}" ] && { diskutil eject "${DISCO%s*}" > /dev/null 2>&1 || hdiutil detach -quiet "${PONTO}" || true; }
     sleep 2

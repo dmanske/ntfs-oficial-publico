@@ -1,0 +1,386 @@
+--- a/ntfs-3g/src/lowntfs-3g.c
++++ b/ntfs-3g/src/lowntfs-3g.c
+@@ -532,99 +532,67 @@
+ 		*err = -errno;
+ }
+ 
+-#if 0 && (defined(__APPLE__) || defined(__DARWIN__)) /* Unfinished. */
+-static int ntfs_macfuse_getxtimes(const char *org_path,
+-		struct timespec *bkuptime, struct timespec *crtime)
+-{
+-	int res = 0;
++#if defined(__APPLE__) || defined(__DARWIN__)
++/*
++ * ntfsoficial: extensões do macOS na API de baixo nível (o bloco "Unfinished" do NTFS-3G era da API de alto nível
++ * e nunca compilava). O driver do Tuxera tem as mesmas (REA: FUN_10000e758 getxtimes, FUN_10000e630 setvolname).
++ */
++
++/*
++ * ntfsoficial: getxtimes devolve a data de criação NTFS (creation_time do $STANDARD_INFORMATION) e a de backup.
++ * O Tuxera guarda a data de backup no stream AFP_AfpInfo (offset 12, época 2000); aqui devolvemos 0
++ * (= "nunca feito backup", o que o macOS assume quando não há valor) porque o NTFS não tem esse campo e criar o
++ * stream AFP_AfpInfo só para isso poluiria o arquivo. Ver ntfs_fuse_setxtimes_flags().
++ */
++static void ntfs_macfuse_getxtimes(fuse_req_t req, fuse_ino_t ino,
++			struct fuse_file_info *fi __attribute__((unused)))
++{
+ 	ntfs_inode *ni;
+-	char *path = NULL;
+-	ntfschar *stream_name;
+-	int stream_name_len;
++	struct timespec bkuptime = { 0, 0 };
++	struct timespec crtime = { 0, 0 };
++	int res = 0;
+ 
+-	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
+-	if (stream_name_len < 0)
+-		return stream_name_len;
+-	memset(bkuptime, 0, sizeof(struct timespec));
+-	memset(crtime, 0, sizeof(struct timespec));
+-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
++	ni = ntfs_inode_open(ctx->vol, INODE(ino));
+ 	if (!ni) {
+-		res = -errno;
+-		goto exit;
++		fuse_reply_err(req, errno);
++		return;
+ 	}
+-        
+-	/* We have no backup timestamp in NTFS. */
+-	crtime->tv_sec = ni->creation_time;
+-exit:
++	crtime = ntfs2timespec(ni->creation_time);
+ 	if (ntfs_inode_close(ni))
+-		set_fuse_error(&res);
+-	free(path);
+-	if (stream_name_len)
+-		free(stream_name);
+-	return res;
++		res = errno;
++	if (res)
++		fuse_reply_err(req, res);
++	else
++		fuse_reply_xtimes(req, &bkuptime, &crtime);
+ }
+ 
+-int ntfs_macfuse_setcrtime(const char *path, const struct timespec *tv)
++/*
++ * ntfsoficial: setvolname renomeia o rótulo do volume ($VOLUME_NAME). Como no Tuxera: recusa nome com mais de
++ * 128 caracteres UTF-16 (ENAMETOOLONG) e, se o volume está montado só leitura, EROFS (a checagem de leitura
++ * vem antes de converter, para não gastar trabalho; a libntfs-3g também recusa). O nome chega em UTF-8 e passa
++ * pela mesma conversão (e normalização NFC) dos nomes de arquivo.
++ */
++static void ntfs_macfuse_setvolname(fuse_req_t req, const char *name)
+ {
+-	ntfs_inode *ni;
+-	int res = 0;
+-
+-	if (ntfs_fuse_is_named_data_stream(path))
+-		return -EINVAL; /* n/a for named data streams. */
+-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+-	if (!ni)
+-		return -errno;
+-        
+-	if (tv) {
+-		ni->creation_time = tv->tv_sec;
+-		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
+-	}
+-
+-	if (ntfs_inode_close(ni))
+-		set_fuse_error(&res);
+-	return res;
+-}
+-
+-int ntfs_macfuse_setbkuptime(const char *path, const struct timespec *tv)
+-{
+-	ntfs_inode *ni;
+-	int res = 0;
+-        
+-	if (ntfs_fuse_is_named_data_stream(path))
+-		return -EINVAL; /* n/a for named data streams. */
+-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+-	if (!ni)
+-		return -errno;
+-        
+-	/* 
+-	 * Only pretending to set backup time successfully to please the APIs of
+-	 * Mac OS X. In reality, NTFS has no backup time.
+-	 */
+-        
+-	if (ntfs_inode_close(ni))
+-		set_fuse_error(&res);
+-	return res;
+-}
+-
+-int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
+-{
+-	ntfs_inode *ni;
++	ntfschar *label = (ntfschar*)NULL;
++	int label_len;
+ 	int res = 0;
+ 
+-	if (ntfs_fuse_is_named_data_stream(path))
+-		return -EINVAL; /* n/a for named data streams. */
+-	ni = ntfs_pathname_to_inode(ctx-&gt;vol, NULL, path);
+-	if (!ni)
+-		return -errno;
+-
+-	if (tv) {
+-		ni-&gt;last_mft_change_time = tv-&gt;tv_sec;
+-		ntfs_fuse_update_times(ni, 0);
++	if (NVolReadOnly(ctx->vol)) {
++		fuse_reply_err(req, EROFS);
++		return;
+ 	}
+-
+-	if (ntfs_inode_close(ni))
+-		set_fuse_error(&amp;res);
+-	return res;
++	label_len = ntfs_mbstoucs(name, &label);
++	if (label_len < 0)
++		res = errno ? errno : EIO;
++	else if (label_len > 128)
++		res = ENAMETOOLONG;
++	else if (ntfs_volume_rename(ctx->vol, label, label_len))
++		res = errno ? errno : EIO;
++	else if (ctx->vol->vol_ni && ntfs_inode_sync(ctx->vol->vol_ni))
++		res = errno ? errno : EIO;
++	free(label);
++	fuse_reply_err(req, res);
+ }
+ #endif /* defined(__APPLE__) || defined(__DARWIN__) */
+ 
+@@ -632,7 +600,13 @@
+ 			struct fuse_conn_info *conn)
+ {
+ #if defined(__APPLE__) || defined(__DARWIN__)
++	/*
++	 * ntfsoficial: o kext só pergunta datas de criação/backup (getxtimes) e só oferece renomear o volume se o
++	 * daemon sinaliza no INIT (osxfuse kext, fuse_internal.c: FUSE_XTIMES e FUSE_VOL_RENAME do fuse_init_out).
++	 * A libfuse já liga FUSE_CAP_XTIMES e FUSE_CAP_VOL_RENAME quando as operações existem; aqui fica explícito.
++	 */
+ 	FUSE_ENABLE_XTIMES(conn);
++	FUSE_ENABLE_SETVOLNAME(conn);
+ #endif
+ #ifdef FUSE_CAP_DONT_MASK
+ 		/* request umask not to be enforced by fuse */
+@@ -754,6 +728,37 @@
+ }
+ 
+ #endif /* DISABLE_PLUGINS */
++
++#if defined(__APPLE__) || defined(__DARWIN__)
++/*
++ * ntfsoficial: metadados do Finder a partir dos atributos NTFS, como o driver do Tuxera (REA: FUN_10000a758,
++ * trecho que preenche st_flags e a data de criação):
++ *   HIDDEN   -> UF_HIDDEN (o Finder esconde o arquivo)
++ *   READONLY -> UF_IMMUTABLE (o macOS recusa apagar/gravar, como o Windows faz com somente leitura)
++ *   sem ARCHIVE (e não diretório) -> SF_ARCHIVED (já houve backup)
++ *   data de criação NTFS -> st_birthtime
++ * Só para arquivos de usuário (registro MFT >= 16): os arquivos de sistema ($MFT, $Boot, a raiz...) não ganham flags.
++ * DIVERGÊNCIA do Tuxera: UF_IMMUTABLE só em arquivo comum, nunca em diretório nem em link simbólico. O Windows usa
++ * READONLY em pastas só para marcar "pasta personalizada" (desktop.ini) e não impede gravar nelas; com
++ * UF_IMMUTABLE o macOS passaria a recusar criar arquivos dentro da pasta.
++ */
++static void ntfs_fuse_getstat_finder(ntfs_inode *ni, struct stat *stbuf)
++{
++	u32 flags = 0;
++
++	stbuf->st_birthtimespec = ntfs2timespec(ni->creation_time);
++	if (ni->mft_no >= FILE_first_user) {
++		if (ni->flags & FILE_ATTR_HIDDEN)
++			flags |= UF_HIDDEN;
++		if ((ni->flags & FILE_ATTR_READONLY) && S_ISREG(stbuf->st_mode))
++			flags |= UF_IMMUTABLE;
++		if (!(ni->flags & FILE_ATTR_ARCHIVE)
++		    && !(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY))
++			flags |= SF_ARCHIVED;
++	}
++	stbuf->st_flags = flags;
++}
++#endif /* defined(__APPLE__) || defined(__DARWIN__) */
+ 
+ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
+ 				ntfs_inode *ni, struct stat *stbuf)
+@@ -986,6 +991,9 @@
+ 	stbuf->st_mtime = ts.tv_sec;
+ 	}
+ #endif
++#if defined(__APPLE__) || defined(__DARWIN__)
++	ntfs_fuse_getstat_finder(ni, stbuf);
++#endif
+ exit:
+ 	return (res);
+ }
+@@ -2243,8 +2251,13 @@
+ 
+ #endif /* defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW) */
+ 
+-static void ntfs_fuse_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+-			 int to_set, struct fuse_file_info *fi __attribute__((unused)))
++/*
++ * ntfsoficial: o corpo do setattr virou esta função, que devolve o resultado em vez de responder ao kext, para
++ * o setattr_x (macOS) reaproveitá-lo para modo/dono/tamanho/atime/mtime.
++ */
++static int ntfs_fuse_setattr_core(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
++			 int to_set, struct fuse_file_info *fi __attribute__((unused)),
++			 struct stat *stbufp)
+ {
+ 	struct stat stbuf;
+ 	ntfs_inode *ni;
+@@ -2322,14 +2335,138 @@
+ 		res = ntfs_fuse_utime(&security, ino, attr, &stbuf);
+ #endif /* defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW) */
+ 	}
++	*stbufp = stbuf;
++	return res;
++}
++
++static void ntfs_fuse_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
++			 int to_set, struct fuse_file_info *fi)
++{
++	struct stat stbuf;
++	int res;
++
++	res = ntfs_fuse_setattr_core(req, ino, attr, to_set, fi, &stbuf);
+ 	if (res)
+ 		fuse_reply_err(req, -res);
+ 	else
+ 		fuse_reply_attr(req, &stbuf, ATTR_TIMEOUT);
+ }
+ 
++#if defined(__APPLE__) || defined(__DARWIN__)
++/*
++ * ntfsoficial: datas de criação/mudança/backup e flags (chflags) do macOS -> atributos NTFS, como o setattr_x do
++ * Tuxera (REA: FUN_10000e910). Mapa dos flags:
++ *   UF_HIDDEN                  <-> FILE_ATTR_HIDDEN
++ *   UF_IMMUTABLE/SF_IMMUTABLE  <-> FILE_ATTR_READONLY (só arquivo comum; diretório e link ficam como estão, ver
++ *                                  ntfs_fuse_getstat_finder)
++ *   SF_ARCHIVED                <-> ausência de FILE_ATTR_ARCHIVE (só fora de diretório)
++ * Outros bits (UF_NODUMP, UF_OPAQUE...) não têm equivalente no NTFS e são ignorados; o Tuxera ignora o pedido
++ * inteiro se vier um bit desconhecido, aqui os bits conhecidos são aplicados.
++ * Data de backup: não há campo no NTFS (o Tuxera usa o stream AFP_AfpInfo); o pedido é aceito e descartado, e o
++ * getxtimes devolve 0.
++ * Registros de sistema (MFT < 16) não são alterados.
++ */
++static int ntfs_fuse_setxtimes_flags(fuse_req_t req, fuse_ino_t ino,
++			struct setattr_x *ax, unsigned int to_set, struct stat *stbuf)
++{
++	struct SECURITY_CONTEXT security;
++	ntfs_inode *ni;
++	int res = 0;
++
++	if (NVolReadOnly(ctx->vol))
++		return -EROFS;
++	ntfs_fuse_fill_security_context(req, &security);
++	ni = ntfs_inode_open(ctx->vol, INODE(ino));
++	if (!ni)
++		return -errno;
+ #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
++	if (!ntfs_allowed_as_owner(&security, ni)) {
++		res = -errno;
++		goto fim;
++	}
++#endif
++	if (ni->mft_no >= FILE_first_user) {
++		if (to_set & FUSE_SET_ATTR_FLAGS) {
++			u32 atual = le32_to_cpu(ni->flags);
++			u32 novo = atual;
++			u32 fl = ax->flags;
+ 
++			if (fl & UF_HIDDEN)
++				novo |= le32_to_cpu(FILE_ATTR_HIDDEN);
++			else
++				novo &= ~le32_to_cpu(FILE_ATTR_HIDDEN);
++			if (!(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
++				if (!(ni->flags & FILE_ATTR_REPARSE_POINT)) {
++					if (fl & (UF_IMMUTABLE | SF_IMMUTABLE))
++						novo |= le32_to_cpu(FILE_ATTR_READONLY);
++					else
++						novo &= ~le32_to_cpu(FILE_ATTR_READONLY);
++				}
++				if (fl & SF_ARCHIVED)
++					novo &= ~le32_to_cpu(FILE_ATTR_ARCHIVE);
++				else
++					novo |= le32_to_cpu(FILE_ATTR_ARCHIVE);
++			}
++			if (novo != atual
++			    && ntfs_set_ntfs_attrib(ni, (const char*)&novo,
++						sizeof(novo), 0))
++				res = -errno;
++		}
++		if (!res && (to_set & FUSE_SET_ATTR_CRTIME))
++			ni->creation_time = timespec2ntfs(ax->crtime);
++		/*
++		 * a mudança de metadados atualiza o ctime, a não ser que o chamador tenha dado um valor
++		 * (aí o valor dele vale, e por isso é gravado depois)
++		 */
++		if (!res) {
++			ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
++			if (to_set & FUSE_SET_ATTR_CHGTIME)
++				ni->last_mft_change_time = timespec2ntfs(ax->chgtime);
++			NInoSetDirty(ni);
++		}
++	}
++	if (!res)
++		res = ntfs_fuse_getstat(&security, ni, stbuf);
++#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
++fim:
++#endif
++	if (ntfs_inode_close(ni))
++		set_fuse_error(&res);
++	return res;
++}
++
++static void ntfs_fuse_setattr_x(fuse_req_t req, fuse_ino_t ino,
++			struct setattr_x *ax, int to_set,
++			struct fuse_file_info *fi)
++{
++	const unsigned int comum = FUSE_SET_ATTR_MODE | FUSE_SET_ATTR_UID
++			| FUSE_SET_ATTR_GID | FUSE_SET_ATTR_SIZE
++			| FUSE_SET_ATTR_ATIME | FUSE_SET_ATTR_MTIME;
++	const unsigned int extras = FUSE_SET_ATTR_CRTIME | FUSE_SET_ATTR_CHGTIME
++			| FUSE_SET_ATTR_BKUPTIME | FUSE_SET_ATTR_FLAGS;
++	struct stat st;
++	struct stat stbuf;
++	int res;
++
++	memset(&st, 0, sizeof(st));
++	st.st_mode = ax->mode;
++	st.st_uid = ax->uid;
++	st.st_gid = ax->gid;
++	st.st_size = ax->size;
++	st.st_atimespec = ax->acctime;
++	st.st_mtimespec = ax->modtime;
++	res = ntfs_fuse_setattr_core(req, ino, &st, (unsigned int)to_set & comum, fi, &stbuf);
++	if (!res && ((unsigned int)to_set & extras))
++		res = ntfs_fuse_setxtimes_flags(req, ino, ax, (unsigned int)to_set, &stbuf);
++	if (res)
++		fuse_reply_err(req, -res);
++	else
++		fuse_reply_attr(req, &stbuf, ATTR_TIMEOUT);
++}
++#endif /* defined(__APPLE__) || defined(__DARWIN__) */
++
++#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
++
+ static void ntfs_fuse_access(fuse_req_t req, fuse_ino_t ino, int mask)
+ {
+ 	int res = 0;
+@@ -4309,12 +4446,11 @@
+ 	.removexattr	= ntfs_fuse_removexattr,
+ 	.listxattr	= ntfs_fuse_listxattr,
+ #endif /* HAVE_SETXATTR */
+-#if 0 && (defined(__APPLE__) || defined(__DARWIN__)) /* Unfinished. */
+-	/* MacFUSE extensions. */
++#if defined(__APPLE__) || defined(__DARWIN__)
++	/* ntfsoficial: extensões do macOS (flags do Finder, datas de criação/backup, nome do volume) */
+ 	.getxtimes	= ntfs_macfuse_getxtimes,
+-	.setcrtime	= ntfs_macfuse_setcrtime,
+-	.setbkuptime	= ntfs_macfuse_setbkuptime,
+-	.setchgtime	= ntfs_macfuse_setchgtime,
++	.setattr_x	= ntfs_fuse_setattr_x,
++	.setvolname	= ntfs_macfuse_setvolname,
+ #endif /* defined(__APPLE__) || defined(__DARWIN__) */
+ 	.init		= ntfs_init
+ };

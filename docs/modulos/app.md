@@ -21,16 +21,22 @@ e mostra estado. Versão 0.1.0 (`app/Sources/NTFSOficial/Shared/Config.swift`).
   (Apple) = "outro driver". A lista é relida a cada 15 s (`Config.intervaloAtualizacao`) para atualizar o espaço livre.
 - **Montar/desmontar/ejetar:** DiskArbitration, sem senha. Se falhar, o alerta mostra o texto do dissenter e oferece
   "Forçar" (botão vermelho).
-- **Verificar:** desmonta, roda como administrador `ntfs-3g.probe --readwrite` + `ntfsfix -n`, interpreta (0 limpo,
-  14 hibernado, 15 sujo, outro = erro), remonta. Não altera o disco.
-- **Reparar:** pede confirmação, desmonta, `ntfsfix` + `ntfsfix -d`, remonta. Não é um `chkdsk`; para dano sério, o
-  alerta manda usar `chkdsk /f` no Windows.
+- **Verificar:** desmonta, roda como administrador `ntfs-3g.probe --readwrite` + `ntfsrecover -n` (só se o probe disser
+  sujo) + `ntfsfix -n`, interpreta (0 limpo, 14 hibernado ou cache do Windows, 15 sujo, outro = erro), remonta. Não
+  altera o disco.
+- **Reparar:** pede confirmação, desmonta, `ntfsrecover` (reaplica o journal do Windows) e, se ele der certo ou o
+  journal não estava sujo, `ntfsfix`; remonta. Hibernado: recusa sem alterar nada. Desde 18/10/2026 **sem** o
+  `ntfsfix -d`: o `ntfsfix` marca o volume para o `chkdsk` do Windows, e limpar essa marca escondia o problema (o
+  driver não precisa dela para montar). O `ntfsrecover` tem limite de 60 s (`alarm 60`), porque pode entrar em laço
+  com um journal estranho. Não é um `chkdsk`; para dano sério, o alerta manda usar `chkdsk /f` no Windows.
 - **Formatar:** NTFS com o nosso `mkntfs -Q -F -L` (administrador); exFAT e FAT32 com `diskutil eraseVolume` (sem
   administrador, e o próprio `diskutil` desmonta/remonta). A folha exige marcar a caixa e nome válido.
 - **Administrador:** `NSAppleScript` com `do shell script … with administrator privileges` (senha padrão do macOS, sem
   serviço fixo). Roda na thread principal, então a janela do app fica parada enquanto a senha está aberta.
 - **Preferências do driver:** lê `/Library/Preferences/com.danielmanske.ntfsoficial.plist` (sem o arquivo: padrões);
   "Aplicar" grava todas as chaves num `defaults write … && …` só (uma senha). Valem para o próximo disco montado.
+  Desde 18/10/2026: recuperação automática com padrão ligado (reaplica o journal do Windows) e o ajuste de nomes
+  estilo SFM (`EnableSFMConversions`, ver `docs/modulos/metadados-e-nomes.md`).
 - **Avisos:** ao abrir e quando a lista muda, `Conflitos.detectar()` procura Tuxera, Paragon e macFUSE+ntfs-3g; o alerta
   sai uma vez por sessão.
 - **Telas (redesenho de 17/10/2026, telas-alvo em `identidade/telas/`):** Gerenciador com lateral (símbolo + nome,
