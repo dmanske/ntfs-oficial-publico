@@ -4,6 +4,8 @@
 |---|---|
 | [operacao/INSTALAR_EM_OUTRO_MAC.md](operacao/INSTALAR_EM_OUTRO_MAC.md) | Instalar (chip Apple e Intel): SIP, Gatekeeper, `.pkg`, desinstalar |
 | [operacao/HACKINTOSH.md](operacao/HACKINTOSH.md) | Hackintosh com OpenCore |
+| [operacao/en/](operacao/en/) | Os dois guias acima em inglês ([INSTALL.md](operacao/en/INSTALL.md), [HACKINTOSH.md](operacao/en/HACKINTOSH.md)) |
+| [operacao/es/](operacao/es/) | Os dois guias acima em espanhol ([INSTALAR.md](operacao/es/INSTALAR.md), [HACKINTOSH.md](operacao/es/HACKINTOSH.md)) |
 | [ARQUITETURA.md](ARQUITETURA.md) | Como o código está organizado e como compilar |
 | [modulos/montagem-automatica.md](modulos/montagem-automatica.md) | Como o disco monta sozinho ao plugar |
 | [modulos/desempenho.md](modulos/desempenho.md) | Velocidade: de 21 para 202 MB/s gravando, e por quê |

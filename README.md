@@ -20,6 +20,8 @@ Leitura e **gravação** de discos NTFS (Windows) no macOS, sem macFUSE e sem Tu
 
 Guia completo, com os comandos: [`docs/operacao/INSTALAR_EM_OUTRO_MAC.md`](docs/operacao/INSTALAR_EM_OUTRO_MAC.md).
 Hackintosh (OpenCore): [`docs/operacao/HACKINTOSH.md`](docs/operacao/HACKINTOSH.md).
+Em inglês: [`en/INSTALL.md`](docs/operacao/en/INSTALL.md), [`en/HACKINTOSH.md`](docs/operacao/en/HACKINTOSH.md).
+Em espanhol: [`es/INSTALAR.md`](docs/operacao/es/INSTALAR.md), [`es/HACKINTOSH.md`](docs/operacao/es/HACKINTOSH.md).
 
 Resumo:
 
@@ -98,5 +100,19 @@ disabled** (`csrutil disable` from Recovery; on Apple silicon also choose *Reduc
 extensions). Unsigned app: `sudo spctl --master-disable` (on macOS 15+ then pick *Anywhere* in Privacy &
 Security), or right-click → Open. Download the `.pkg` from Releases, install, allow the extension in Privacy &
 Security and restart. GPL-2.0.
+
+Full guides in English: [installing on a Mac](docs/operacao/en/INSTALL.md) and
+[Hackintosh (OpenCore)](docs/operacao/en/HACKINTOSH.md). Tested with 0.2.1 on an Apple-silicon Mac (macOS 27) and an
+Intel Hackintosh (macOS 26.6.2); not yet on AMD, macOS 14/15 or a real Intel Mac. Bug reports and test results:
+[issues](https://github.com/dmanske/ntfs-oficial-publico/issues).
+
+## Español (corto)
+
+Lectura y escritura de NTFS en macOS, sin macFUSE, Tuxera ni Paragon. Instalador universal (chip de Apple e Intel),
+macOS 14 o más nuevo. Usa su propia extensión de kernel sin el certificado de Apple, así que **hay que desactivar el
+SIP** (en un Hackintosh, por el `csr-active-config` de OpenCore). Guías completas: [instalar en un
+Mac](docs/operacao/es/INSTALAR.md) y [Hackintosh (OpenCore)](docs/operacao/es/HACKINTOSH.md). Probado con la 0.2.1 en un
+Mac con chip de Apple (macOS 27) y en un Hackintosh Intel (macOS 26.6.2). Errores y resultados de pruebas:
+[issues](https://github.com/dmanske/ntfs-oficial-publico/issues). GPL-2.0.
 
 Criado por Daniel Manske.

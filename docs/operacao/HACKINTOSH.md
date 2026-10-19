@@ -1,5 +1,8 @@
 # NTFS Oficial no Hackintosh (OpenCore)
 
+> English: [`en/HACKINTOSH.md`](en/HACKINTOSH.md) · Español: [`es/HACKINTOSH.md`](es/HACKINTOSH.md) (traduções de
+> 19/10/2026; se mudar este guia, mude as duas).
+
 19/10/2026. **Testado e funcionando** num Hackintosh Intel com a 0.2.1 (ver [Testado](#testado-19102026-021)). Use a
 **0.2.1 ou mais nova**: a 0.2.0 só carregava o kext no macOS 27 e, nos outros, os discos NTFS sumiam do Finder
 ([`correcoes/2026-10-19_kext-so-carregava-no-macos-27.md`](../correcoes/2026-10-19_kext-so-carregava-no-macos-27.md)).

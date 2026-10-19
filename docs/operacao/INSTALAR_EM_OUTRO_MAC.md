@@ -1,5 +1,8 @@
 # Instalar o NTFS Oficial em outro Mac
 
+> English: [`en/INSTALL.md`](en/INSTALL.md) · Español: [`es/INSTALAR.md`](es/INSTALAR.md) (traduções de 19/10/2026; se
+> mudar este guia, mude as duas).
+
 17/10/2026. Vale para Mac com chip Apple (M1, M2, M3, M4… — todos iguais) e Mac Intel. Para Hackintosh, ver
 [`HACKINTOSH.md`](HACKINTOSH.md).
 
@@ -94,6 +97,9 @@ kmutil showloaded --list-only | grep ntfsoficial       # o kext carregado
 mount | grep ntfsoficial                               # discos montados pelo NTFS Oficial
 cat /private/var/log/ntfsoficial-instalacao.log        # o que o instalador fez
 ```
+
+**Ao atualizar:** instalar uma versão nova pode pedir para permitir o kext de novo em Privacidade e Segurança e
+reiniciar; até lá, os discos ficam só leitura pelo NTFS da Apple.
 
 ## Desinstalar
 
