@@ -3,9 +3,9 @@
 17/10/2026. Vale para Mac com chip Apple (M1, M2, M3, M4… — todos iguais) e Mac Intel. Para Hackintosh, ver
 [`HACKINTOSH.md`](HACKINTOSH.md).
 
-Testado de ponta a ponta só no Mac do Daniel (Apple Silicon, macOS 27). Mac Intel: pacote compilado para Intel
-e programas testados com o Rosetta; o kext Intel foi carregado num Intel de verdade em 19/10/2026 (Hackintosh, macOS
-26.6.2, 0.2.1: monta e grava numa imagem de teste). Num Mac Intel de verdade, ainda não.
+Testado de ponta a ponta com a 0.2.1 (19/10/2026, o mesmo pacote) no Mac do Daniel (chip Apple, macOS 27) e num
+Hackintosh Intel (macOS 26.6.2: kext carregado no boot, 4 discos internos montados com gravação; ver
+[`HACKINTOSH.md`](HACKINTOSH.md)). Ainda não testado num Mac Intel de verdade nem no macOS 14 e 15.
 
 > **Use a 0.2.1 ou mais nova fora do macOS 27.** O kext da 0.2.0 pedia o kernel do macOS 27 e era recusado nas outras
 > versões, sem pedir aprovação; os discos NTFS sumiam do Finder. Ver
