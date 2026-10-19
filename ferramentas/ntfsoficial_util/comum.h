@@ -29,12 +29,20 @@
 #define NTFSRECOVER          SUPORTE "/ntfsrecover"
 #define NTFSFIX              SUPORTE "/ntfsfix"
 #define MKNTFS               SUPORTE "/mkntfs"
+#define LOAD_KEXT            SUPORTE "/load_" NOME
 
 /* Quanto esperar o volume aparecer depois de o driver retornar. O tuxera_ntfs_wait espera 15 s (REA). */
 #define ESPERA_MONTAGEM_SEGUNDOS  15
 /* Limite para o ntfsrecover: com um journal estranho ele pode ficar em laço infinito (visto com uma imagem
  * de teste), e o macOS ficaria esperando a montagem. Passou disso, o disco monta só para leitura. */
 #define LIMITE_RECUPERACAO_SEGUNDOS  60
+/* Limite para o load_ntfsoficial na detecção: com o kext certo já carregado ele volta na hora; sem kext, o
+ * KextManager pode demorar (pedido de aprovação). Passou disso, o disco fica para o NTFS da Apple. */
+#define LIMITE_LOAD_SEGUNDOS  30
+/* Dono dos arquivos quando o macOS não manda uid=/gid=: 99, o "desconhecido". O kernel mostra 99 como quem está
+ * olhando (xnu, kpi_vfs.c, vnode_attr_handle_uid_and_gid), então cada pessoa vê os arquivos como seus, mesmo com o
+ * disco montado antes do login. É o que o Tuxera faz com adaptiveuid/adaptivegid (REA). */
+#define DONO_DESCONHECIDO  99
 
 /* Respostas ao macOS (sys/loadable_fs.h); como código de saída viram 255, 254... */
 #define RESPOSTA_RECONHECIDO      (-1)  /* FSUR_RECOGNIZED */
@@ -81,6 +89,8 @@ void controle_ler(const char *dispositivo, controle_t *c);
 int executar(char *const argv[], char *saida, size_t tamanho);
 /* Igual, mas mata o programa se passar de "segundos" (0 = sem limite) e devolve -1. */
 int executar_limite(char *const argv[], char *saida, size_t tamanho, int segundos);
+/* Igual a executar, mas guarda só o stdout (stderr para /dev/null): quando a saída é um dado, como o rótulo. */
+int executar_so_stdout(char *const argv[], char *saida, size_t tamanho);
 
 /* --- registro.c: log unificado do macOS (subsistema IDENTIFICADOR) --- */
 void registro_iniciar(bool depurar);

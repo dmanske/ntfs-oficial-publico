@@ -27,7 +27,7 @@ plugar o disco
 |---|---|---|
 | Registro no macOS | `Contents/Info.plist` (gerado por `scripts/montar-pacote.sh`) | `FSMediaTypes` para `Windows_NTFS`, GPT `EBD0A0A2-…` e `Windows_LDM` (ordem 400), tipos FAT (1900: só o que o FAT da Apple, em 1000, recusou) e disco inteiro (3400); antes do Tuxera (440/1940) e da Apple (1000). Personalidade com verificar (`-v`), reparar (`-r`) e formatar (`newfs_ntfsoficial`), para o Utilitário de Disco |
 | Detecção | `ferramentas/ntfsoficial_util/detectar.c` | 0, 14 ou 15 do `ntfs-3g.probe` reconhece, como o Tuxera; 13 (corrompido) e o resto ficam para o NTFS só leitura da Apple |
-| Montagem | `ferramentas/ntfsoficial_util/montar.c` | opções: `local`, `iosize=1048576`, `uid/gid`, `sfmconv` (ou `nosfmconv,windows_names`), `nfconv`, xattr, sempre `norecover`, `volname`; disco sujo passa antes pelo replay; o que não puder gravar → só leitura + aviso |
+| Montagem | `ferramentas/ntfsoficial_util/montar.c` | opções: `local`, `iosize=1048576`, `uid=99,gid=99` (o kernel mostra 99 como quem está olhando, como o `adaptiveuid` do Tuxera; se o macOS mandar `uid=`/`gid=`, valem os dele), `sfmconv` (ou `nosfmconv,windows_names`), `nfconv`, xattr, sempre `norecover`, `volname`; disco sujo passa antes pelo replay; o que não puder gravar → só leitura + aviso |
 | Replay do journal | `ferramentas/ntfsoficial_util/recuperar.c` | classifica pelo `ntfs-3g.probe --readwrite` e roda o `ntfsrecover` (seção abaixo) |
 | Utilitário de Disco | `ferramentas/ntfsoficial_util/utilitario.c` | `-v`/`-q` verificar, `-r`/`-y` reparar, `newfs_ntfsoficial [-v rótulo] <disco>` formatar (argumentos e códigos do Tuxera) |
 | Rodar o driver | `ferramentas/ntfsoficial_util/executar.c` | saída em arquivo temporário (não pipe), entrada `/dev/null`; `executar_limite` mata o processo no tempo limite |
@@ -45,11 +45,17 @@ confirmadas no `$LogFile` que não chegaram aos metadados. O Tuxera reaplica ess
 | Probe `--readwrite` | O que é | O que o util faz |
 |---|---|---|
 | 0 | limpo | monta com gravação |
+| 0, mas com a marca do chkdsk (`VOLUME_IS_DIRTY`) e journal limpo | o Windows marcou o disco para conferir | monta com gravação, como o Tuxera; a marca fica até um chkdsk no Windows |
 | 15 | journal sujo | `ntfsrecover` (replay; termina gravando o journal como limpo, versão 1.1) → probe tem que dar 0 → monta com gravação |
 | 14, mensagem "hibernated" | Windows hibernado (`hiberfil.sys`) | só leitura; nunca mexe no journal |
 | 14, sem "hibernated" | journal 2.0, "Metadata kept in Windows cache" (inicialização rápida, ou disco arrancado do Windows 8+) | tenta o `ntfsrecover`, que recusa ("Fast restart mode detected") sem `-k`; fica só leitura. O `-k` jogaria fora o cache do Windows e não é usado |
 | replay falha, ou `EnableAutomaticRecovery = 0` | — | só leitura + aviso (motivo gravado para o app) |
 
+- A marca `VOLUME_IS_DIRTY` (19/10/2026, decisão do Daniel): a libntfs-3g ignora de propósito (`ntfsprogs/utils.c:271-278`),
+  e o Tuxera também monta com gravação e não mexe na marca ao montar. O **Reparar não tira a marca** (decisão de 18/10/2026):
+  o Tuxera só tira depois do `ntfsck` completo dele, que não temos; e o `ntfsfix -d` também apagaria as flags
+  `0x0100`/`0x0200` (máscara `0xc03f` do NTFS-3G), que nem sabemos o que são. Evidência:
+  `planos/KEXT_SO_CARREGA_NO_MACOS_27_2026-10-19.md`. Para ver as flags de um disco: `scripts/diagnostico/verificar_disco.c`.
 - A opção `recover` do NTFS-3G só **zera** o journal (descarta as transações). Nunca é passada; o driver recebe
   sempre `norecover`.
 - O `ntfsrecover` entrou em laço infinito com um journal de teste estranho; por isso o limite de 60 s.

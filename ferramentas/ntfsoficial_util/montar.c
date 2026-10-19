@@ -3,8 +3,8 @@
  * (chamado pelo macOS com o FSMountExecutable do pacote, ou à mão)
  *
  * Opções passadas ao driver, como o _op_mount do Tuxera (REA):
- *   local, iosize (1 MiB), uid/gid da pessoa, nfconv conforme preferência e arquivo de controle,
- *   modo de xattr (XattrMode), sfmconv/nosfmconv (EnableSFMConversions), volname.
+ *   local, iosize (1 MiB), uid/gid 99 (cada pessoa vê os arquivos como seus), nfconv conforme preferência e
+ *   arquivo de controle, modo de xattr (XattrMode), sfmconv/nosfmconv (EnableSFMConversions), volname.
  *
  * Disco sujo (probe 14/15): com EnableAutomaticRecovery (padrão 1, como o Tuxera) roda o ntfsrecover, que
  * reaplica o journal do Windows, e monta com gravação. O driver sempre recebe `norecover`: a opção `recover`
@@ -45,29 +45,34 @@ static void opcoes_do_sistema(const char *lista, char *repassar, bool *so_leitur
     }
 }
 
-/* Dono dos arquivos: quem chamou; se for root (montagem pelo sistema), quem está logado na tela. */
-static void dono(uid_t *uid, gid_t *gid)
+/* A opção (ex.: "uid=") veio nas opções do macOS? */
+static bool tem_opcao(const char *lista, const char *prefixo)
 {
-    *uid = getuid();
-    *gid = getgid();
-    struct stat st;
-    if (*uid == 0 && stat("/dev/console", &st) == 0 && st.st_uid != 0) {
-        *uid = st.st_uid;
-        *gid = st.st_gid;
+    char copia[MAX_OPCOES];
+    strlcpy(copia, lista, sizeof(copia));
+    for (char *o = strtok(copia, ","); o; o = strtok(NULL, ",")) {
+        if (strncmp(o, prefixo, strlen(prefixo)) == 0) return true;
     }
+    return false;
 }
 
 static void montar_opcoes(char *o, const preferencias_t *p, const controle_t *c, const char *ponto,
                           const char *sistema, bool so_leitura)
 {
     char item[512];
-    uid_t uid; gid_t gid;
-    dono(&uid, &gid);
 
     o[0] = '\0';
     juntar(o, "local");
     snprintf(item, sizeof(item), "iosize=%ld", p->iosize); juntar(o, item);
-    snprintf(item, sizeof(item), "uid=%u,gid=%u", uid, gid); juntar(o, item);
+    /* Dono: 99 (DONO_DESCONHECIDO), a não ser que o macOS mande o seu. Como o _op_mount do Tuxera, que só passa
+     * adaptiveuid/adaptivegid sem uid=/gid= do sistema (REA). Antes era o dono de /dev/console, que no boot
+     * (antes do login) é root ou _windowserver, e o git recusava repositório nesses discos (19/10/2026). */
+    if (!tem_opcao(sistema, "uid=")) {
+        snprintf(item, sizeof(item), "uid=%d", DONO_DESCONHECIDO); juntar(o, item);
+    }
+    if (!tem_opcao(sistema, "gid=")) {
+        snprintf(item, sizeof(item), "gid=%d", DONO_DESCONHECIDO); juntar(o, item);
+    }
     if (geteuid() == 0) juntar(o, "allow_other");   /* montado pelo sistema: a pessoa precisa acessar */
     /* Nomes com : * ? " < > | e afins. O Tuxera usa o estilo SFM (Services for Macintosh: grava U+F021... no
      * lugar) e NÃO passa windows_names (REA); sem SFM, windows_names recusa criar esses nomes. */

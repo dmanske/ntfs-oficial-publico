@@ -1,0 +1,19 @@
+--- a/kext/osxfuse/Info.plist	2026-10-19 10:55:52
++++ b/kext/osxfuse/Info.plist	2026-10-19 10:56:03
+@@ -6,7 +6,15 @@
+ 
+ #include <libkern/version.h>
+ 
+-#define OSXFUSE_KPI_VERSION FUSE_PP_CAT(VERSION_MAJOR, .0.0)
++/*
++ * ntfsoficial: KPI fixa (KPI_MINIMO de scripts/config.sh), nunca a do SDK. VERSION_MAJOR vem do
++ * libkern/version.h de quem compila: com o SDK do macOS 27 o kext saiu pedindo 27.0.0 e só carregava
++ * no macOS 27 (0.2.0, 19/10/2026). O Tuxera declara 9.0.0 (docs/planos/KEXT_SO_CARREGA_NO_MACOS_27_2026-10-19.md).
++ */
++#ifndef NTFSOFICIAL_KPI_MINIMO
++#error "passar NTFSOFICIAL_KPI_MINIMO (scripts/compilar-kext.sh, KPI_MINIMO do config.sh)"
++#endif
++#define OSXFUSE_KPI_VERSION NTFSOFICIAL_KPI_MINIMO
+ -->
+ <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">

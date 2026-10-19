@@ -52,7 +52,11 @@ for ARQ in ${ARQUITETURAS_USUARIO}; do
     rodar "${LOG_NTFS}" ./autogen.sh
     # A libfuse entra estática (como o Tuxera faz com a libtuxera_ntfs); por isso as variáveis
     # FUSE_MODULE_* no lugar do pkg-config. Sem criptografia e sem plugins.
-    rodar "${LOG_NTFS}" env \
+    # ac_cv_header_libintl_h=no: no Mac Intel o Homebrew fica em /usr/local, e o configure achava o libintl.h do
+    # gettext (/usr/local/include), que troca setlocale por libintl_setlocale sem linkar a libintl (e ela só
+    # existe em x86_64): o arm64 não linkava (19/10/2026, Hackintosh). No chip Apple (/opt/homebrew) o cabeçalho
+    # não é achado: assim os dois Macs geram o mesmo binário (a 0.2.0 usa o setlocale do sistema).
+    rodar "${LOG_NTFS}" env ac_cv_header_libintl_h=no \
         FUSE_MODULE_CFLAGS="-I${PREFIXO}/include/osxfuse/fuse -D_FILE_OFFSET_BITS=64 -D_DARWIN_USE_64_BIT_INODE" \
         FUSE_MODULE_LIBS="${PREFIXO}/lib/libosxfuse.a -liconv" \
         CFLAGS="${CFLAGS_BASE}" LDFLAGS="-arch ${ARQ}" \

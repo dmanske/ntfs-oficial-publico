@@ -28,14 +28,33 @@ launchctl bootstrap system "${PLIST_SERVICO}" || echo "AVISO: não foi possível
 launchctl print "system/${SERVICO}" 2>/dev/null | grep -E '^\s*state'
 
 echo "-> kext"
+KEXT="${PACOTE_FS}/Contents/Extensions/${NOME}.kext"
 KEXT_OK=0
+# Kernel mais velho que a KPI que o kext declara: o kmutil recusa antes de pedir aprovação (0.2.0 pedia 27.0.0)
+KPI="$(/usr/libexec/PlistBuddy -c 'Print :OSBundleLibraries:com.apple.kpi.bsd' "${KEXT}/Contents/Info.plist" 2>/dev/null)"
+KERNEL="$(uname -r | cut -d. -f1)"
 if kmutil showloaded --list-only 2>/dev/null | grep -q "${ID_KEXT}"; then
     KEXT_OK=1
+elif [ -n "${KPI}" ] && [ "${KPI%%.*}" -gt "${KERNEL}" ]; then
+    echo "ERRO: este kext pede o kernel ${KPI} ou mais novo; este Mac tem $(uname -r) (macOS $(sw_vers -productVersion))." \
+         "Os discos ficam com o NTFS da Apple (só leitura)"
 else
-    # Num Mac novo isso dispara o pedido de aprovação (Ajustes -> Privacidade e Segurança); falhar aqui é esperado
-    "${PACOTE_FS}/Contents/Resources/Support/load_${NOME}" \
-        || kmutil load -p "${PACOTE_FS}/Contents/Extensions/${NOME}.kext" \
-        || echo "AVISO: kext não carregou (falta aprovar em Ajustes e reiniciar)"
+    # Num Mac novo o load dispara o pedido de aprovação (Ajustes -> Privacidade e Segurança); falhar aqui é esperado.
+    # Códigos do load_ntfsoficial: 1 = falta aprovar (EPERM); 2 = kext não encontrado; 255 = outra falha.
+    "${PACOTE_FS}/Contents/Resources/Support/load_${NOME}"
+    CODIGO_LOAD=$?
+    echo "load_${NOME} = ${CODIGO_LOAD}"
+    if [ "${CODIGO_LOAD}" != 0 ]; then
+        # Segunda tentativa: não sabemos qual dos dois dispara o pedido de aprovação
+        kmutil load -p "${KEXT}"
+        echo "kmutil load = $?"
+        if [ "${CODIGO_LOAD}" = 1 ]; then
+            echo "AVISO: falta aprovar a extensão em Ajustes → Privacidade e Segurança e reiniciar"
+        else
+            echo "AVISO: o kext não carregou (load_${NOME} = ${CODIGO_LOAD})"
+            kmutil print-diagnostics -p "${KEXT}"
+        fi
+    fi
     kmutil showloaded --list-only 2>/dev/null | grep -q "${ID_KEXT}" && KEXT_OK=1
 fi
 if [ "${KEXT_OK}" = 1 ]; then

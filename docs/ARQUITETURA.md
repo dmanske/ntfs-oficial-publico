@@ -63,6 +63,9 @@ ntfs-oficial/
 - **Nomes:** identificador `ntfsoficial`; pacotes `com.danielmanske.ntfsoficial.*`.
 - **Valores ajustáveis num lugar só:** `scripts/config.sh` (versão, nomes, caminhos de instalação),
   lido pelos scripts e gerando as constantes de C; no app, `Shared/Config.swift`.
+- **A KPI do kext vem de `KPI_MINIMO` no `config.sh`, nunca do SDK** (patch `0006`; o `compilar-kext.sh` confere as 5
+  `OSBundleLibraries`). Muda junto com `MACOS_PKG_MINIMO` (mesmo macOS). A 0.2.0 saiu com a KPI do SDK 27 e só
+  carregava no macOS 27 (`correcoes/2026-10-19_kext-so-carregava-no-macos-27.md`).
 - Um arquivo por responsabilidade. Não criar pasta vazia.
 
 ### 3.2 Compilar

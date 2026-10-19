@@ -10,7 +10,6 @@ ID_RECIBO="${IDENTIFICADOR}.pacote"   # o desinstalar-ntfs-oficial.command usa o
 SERVICO="${IDENTIFICADOR}.desmontar"
 APP="${SAIDA}/NTFS Oficial.app"
 PACOTE="${SAIDA}/${NOME}.fs"
-MACOS_PKG_MINIMO="14.0"               # o app SwiftUI pede macOS 14
 TRABALHO="${BUILD}/instalador"
 RAIZ_PKG="${TRABALHO}/raiz"
 DESTINO="${SAIDA}/NTFS-Oficial-${VERSAO}.pkg"

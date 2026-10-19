@@ -31,6 +31,7 @@ for ARQ in ${ARQUITETURAS_KEXT}; do
             MACOSX_DEPLOYMENT_TARGET="${MACOS_MINIMO}" OSXFUSE_VERSION="${VERSAO_KEXT}" \
             PRODUCT_NAME="${NOME}" CODE_SIGN_IDENTITY="${ASSINATURA}" \
             WARNING_CFLAGS="\$(inherited) ${AVISOS_DESLIGADOS}" \
+            INFOPLIST_PREPROCESSOR_DEFINITIONS="KERNEL NTFSOFICIAL_KPI_MINIMO=${KPI_MINIMO}" \
             SYMROOT="${DESTINO}" OBJROOT="${BUILD}/obj/kext-${ARQ}" build >> "${LOG}" 2>&1; then
         echo "ERRO na compilação. Erros (log completo em ${LOG}):"
         grep -E 'error:' "${LOG}" | sed -E "s#${ORIGEM}/##" | sort -u | head -40
@@ -44,5 +45,14 @@ if [ "${#EXECUTAVEIS[@]}" -gt 1 ]; then
     lipo -create "${EXECUTAVEIS[@]}" -output "${BUILD}/obj/${NOME}-universal"
     cp "${BUILD}/obj/${NOME}-universal" "${KEXT}/Contents/MacOS/${NOME}"
     codesign -f -s "${ASSINATURA}" "${KEXT}"
+fi
+# A KPI declarada decide em que macOS o kext carrega (patch 0006). PlistBuddy, não plutil -extract: as chaves têm ponto.
+echo "==> Conferindo as OSBundleLibraries (todas = ${KPI_MINIMO})"
+BIBLIOTECAS="$(/usr/libexec/PlistBuddy -c 'Print :OSBundleLibraries' "${KEXT}/Contents/Info.plist")"
+ERRADAS="$(echo "${BIBLIOTECAS}" | grep ' = ' | grep -v " = ${KPI_MINIMO}$" || true)"
+if [ -n "${ERRADAS}" ] || ! echo "${BIBLIOTECAS}" | grep -q ' = '; then
+    echo "ERRO: o kext não saiu com a KPI ${KPI_MINIMO} (KPI_MINIMO em scripts/config.sh) em todas as OSBundleLibraries:"
+    echo "${BIBLIOTECAS}"
+    exit 1
 fi
 echo "==> Pronto: ${KEXT} ($(lipo -archs "${KEXT}/Contents/MacOS/${NOME}"))"

@@ -3,6 +3,26 @@
 17/10/2026. **Ainda não testado** — guia para quando formos no PC do Daniel. Marcado com ⚠️ o que precisa
 conferir lá.
 
+> **19/10/2026 — primeira tentativa (0.2.0), não funcionou.** PC: Intel `x86_64`, macOS 26.6.2 (kernel 25.6.0),
+> OpenCore REL-107-2026-03-20, `csr-active-config` = `03080000` (já basta: `Kext Signing: disabled`). O kext da
+> 0.2.0 exige kernel 27 e é recusado antes de pedir aprovação; os discos NTFS somem do Finder. Corrigido na 0.2.1
+> ([`correcoes/2026-10-19_kext-so-carregava-no-macos-27.md`](../correcoes/2026-10-19_kext-so-carregava-no-macos-27.md));
+> plano e teste: [`planos/KEXT_SO_CARREGA_NO_MACOS_27_2026-10-19.md`](../planos/KEXT_SO_CARREGA_NO_MACOS_27_2026-10-19.md).
+>
+> **Estado em 19/10/2026 (0.2.1): funcionando.** Kext 0.1.1 carregado no boot (o OpenCore não recusou, sem mexer no
+> `SecureBootModel`); os 4 discos internos do Windows (DADOS 1 1TB, DADOS 2 1TB, 3TB, Windows) montam sozinhos pelo NTFS
+> Oficial, com gravação. Eles têm a marca do chkdsk (`VOLUME_IS_DIRTY`) com journal limpo e montam com gravação, como no
+> Tuxera (decisão do Daniel). Os números dos discos (`diskN`) mudam a cada reinício: identificar pelo nome.
+> Com o pacote final da 0.2.1 (`a08bc259…`, instalado às 13:53): kext x86_64 `71E49789-…`; os discos montados no boot
+> aparecem como do usuário (`uid=99` na montagem, `ls -ln` = 501) e o `git` funciona neles. Ao instalar por cima, o macOS
+> pediu aprovação de novo (até aprovar, os discos ficam só leitura pela Apple).
+> **Para voltar** a só leitura pelo NTFS da Apple: `sudo defaults write /Library/Preferences/com.danielmanske.ntfsoficial
+> DisableDriver -int 1` e reiniciar (desfazer: `sudo defaults delete … DisableDriver`).
+>
+> **Compilar no Hackintosh (Intel):** funciona com o Xcode 26.5 e o Homebrew em `/usr/local` (autoconf, automake,
+> libtool, pkgconf). O `compilar-usuario.sh` ignora o `libintl.h` do gettext do Homebrew (`ac_cv_header_libintl_h=no`),
+> que quebrava o link do arm64.
+
 O Hackintosh usa o pacote **Intel** (o mesmo `.pkg` universal de [`INSTALAR_EM_OUTRO_MAC.md`](INSTALAR_EM_OUTRO_MAC.md)).
 A diferença é como desligar a proteção do sistema: no Hackintosh quem manda nisso é o `config.plist` do
 OpenCore, não o `csrutil` (o OpenCore reescreve o valor a cada inicialização se estiver configurado para isso).

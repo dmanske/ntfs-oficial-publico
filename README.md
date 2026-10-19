@@ -9,7 +9,8 @@ Leitura e **gravação** de discos NTFS (Windows) no macOS, sem macFUSE e sem Tu
 - App na barra de menus com gerenciador de discos: abrir, ejetar, verificar, reparar e formatar.
 - Avisa quando o disco só pode ser lido (Windows hibernado ou desligado sem "Desligar").
 - Português do Brasil (padrão) e inglês.
-- Um instalador só para **Mac com chip Apple (M1, M2, M3, M4)** e **Mac Intel**. macOS 14 ou mais novo.
+- Um instalador só para **Mac com chip Apple (M1, M2, M3, M4)** e **Mac Intel**. macOS 14 ou mais novo (testado de
+  verdade no macOS 27 com chip Apple e no macOS 26.6 num Hackintosh Intel).
 
 > **Atenção:** o NTFS Oficial usa uma extensão de kernel própria, sem o certificado da Apple que os produtos
 > pagos têm. Por isso o Mac precisa estar com a **Proteção da Integridade do Sistema (SIP) desligada**. Leia o
@@ -63,6 +64,7 @@ Detalhes em [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) e [`docs/modulos/`](doc
 
 | Versão | Data | O que mudou |
 |---|---|---|
+| 0.2.1 | 19/10/2026 | Correção: a extensão de kernel da 0.2.0 só carregava no macOS 27 (nos outros, os discos NTFS sumiam do Finder). Agora carrega a partir do macOS 14; se não carregar, o disco fica com o NTFS da Apple (só leitura); nome do volume certo em disco que o Windows deixou sujo; o instalador diz o motivo quando a extensão não carrega; disco montado antes do login não fica mais em nome do sistema |
 | 0.2.0 | 18/10/2026 | Disco sujo do Windows montado com gravação; Finder (ocultos, cadeado, data de criação, renomear volume); nomes SFM; Utilitário de Disco; correções (nada montava depois da 0.1.1; disco com espaço no nome não era desmontado ao desligar). Kext 0.1.1: precisa aprovar de novo e reiniciar |
 | 0.1.1 | 17/10/2026 | App não some mais em segundo plano |
 | 0.1.0 | 17/10/2026 | Primeira versão |

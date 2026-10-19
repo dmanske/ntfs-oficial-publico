@@ -5,6 +5,10 @@
  * (o daemon do FUSE) que herda a saída. Com pipe, quem lê esperaria esse processo terminar, ou seja,
  * até desmontar. O tuxera_ntfs_wait também não captura a saída do driver: faz fork + execvp e herda os
  * descritores (REA, docs/design/REFERENCIA_TUXERA.md seção 12).
+ *
+ * executar_so_stdout: o stderr vai para /dev/null. Para quem usa a saída como dado (o rótulo do ntfslabel),
+ * não como mensagem: o tuxera_ntfs.util faz a detecção com 2>/dev/null e só junta o stderr (2>&1) quando
+ * roda de novo para o log (REA, _ainvoke_external).
  */
 #include "comum.h"
 
@@ -19,12 +23,24 @@
 
 extern char **environ;
 
+static int rodar(char *const argv[], char *saida, size_t tamanho, int segundos, bool com_stderr);
+
 int executar(char *const argv[], char *saida, size_t tamanho)
 {
-    return executar_limite(argv, saida, tamanho, 0);
+    return rodar(argv, saida, tamanho, 0, true);
 }
 
 int executar_limite(char *const argv[], char *saida, size_t tamanho, int segundos)
+{
+    return rodar(argv, saida, tamanho, segundos, true);
+}
+
+int executar_so_stdout(char *const argv[], char *saida, size_t tamanho)
+{
+    return rodar(argv, saida, tamanho, 0, false);
+}
+
+static int rodar(char *const argv[], char *saida, size_t tamanho, int segundos, bool com_stderr)
 {
     char modelo[] = "/tmp/" NOME ".XXXXXX";
     int fd_saida = -1;
@@ -38,7 +54,11 @@ int executar_limite(char *const argv[], char *saida, size_t tamanho, int segundo
         if (fd_saida < 0) return -1;
         unlink(modelo);                      /* some sozinho quando ninguém mais usar */
         posix_spawn_file_actions_adddup2(&acoes, fd_saida, STDOUT_FILENO);
-        posix_spawn_file_actions_adddup2(&acoes, fd_saida, STDERR_FILENO);
+        if (com_stderr) {
+            posix_spawn_file_actions_adddup2(&acoes, fd_saida, STDERR_FILENO);
+        } else {
+            posix_spawn_file_actions_addopen(&acoes, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
+        }
     } else {
         posix_spawn_file_actions_addopen(&acoes, STDOUT_FILENO, "/dev/null", O_WRONLY, 0);
         posix_spawn_file_actions_addopen(&acoes, STDERR_FILENO, "/dev/null", O_WRONLY, 0);

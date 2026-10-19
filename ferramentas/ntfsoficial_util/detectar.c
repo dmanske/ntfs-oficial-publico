@@ -1,7 +1,7 @@
 /*
  * Detecção: ntfsoficial.util -p <disco> <removable|fixed> <readonly|writable>
  *
- * Fluxo do _op_probe do Tuxera (REA, docs/design/REFERENCIA_TUXERA.md), com uma diferença:
+ * Fluxo do _op_probe do Tuxera (REA, docs/design/REFERENCIA_TUXERA.md), com duas diferenças (2 e 5):
  *   1. preferência DisableDriver -> não reconhece;
  *   2. (nosso) assinatura "NTFS    " no setor de boot: responde rápido "não é meu" para FAT/exFAT,
  *      que usam o mesmo tipo de partição GPT (EBD0A0A2-...);
@@ -10,7 +10,13 @@
  *      fica para o NTFS só leitura da Apple. Em 14/15 a montagem decide o que fazer (montar.c: replay do
  *      journal com o ntfsrecover ou só leitura);
  *   4. arquivo de controle disable-driver no disco -> não reconhece;
- *   5. escreve o rótulo do volume e responde RECONHECIDO.
+ *   5. load_ntfsoficial (carrega o kext; com o kext certo já carregado volta 0 na hora): qualquer falha ->
+ *      não reconhece, e o disco fica para o NTFS da Apple (só leitura). Sem isso, um kext que não carrega
+ *      (falta aprovar, macOS incompatível) deixava o disco sem montar nenhum (0.2.0 no Hackintosh, 19/10/2026).
+ *      O Tuxera faz parecido no driver em -oprobe, mas só responde "não reconhecido" quando falta aprovar
+ *      (código 27); em qualquer outra falha do load ele reconhece;
+ *   6. escreve o rótulo do volume (só o stdout do ntfslabel; o stderr traz avisos como "Dirty volume mount
+ *      was forced", que viravam o nome do volume) e responde RECONHECIDO.
  */
 #include "comum.h"
 
@@ -35,8 +41,22 @@ static bool tem_assinatura_ntfs(const char *dispositivo)
 static void ler_rotulo(const char *dispositivo, char *rotulo, size_t tamanho)
 {
     char *argv[] = { NTFSLABEL, "-f", (char *)dispositivo, NULL };
-    if (executar(argv, rotulo, tamanho) != 0) rotulo[0] = '\0';
+    if (executar_so_stdout(argv, rotulo, tamanho) != 0) rotulo[0] = '\0';
     rotulo[strcspn(rotulo, "\r\n")] = '\0';
+}
+
+/* Códigos do load_ntfsoficial (support/load_osxfuse): 1 = falta aprovar (kOSKextReturnSystemPolicy -> EPERM,
+ * fuse_kext.c:322); 2 = kext não encontrado (ENOENT); 255 = outra falha, por exemplo dependência; -1 = não rodou
+ * ou passou do limite. Com o kext da versão errada carregado, ele tenta descarregar e carregar o certo. */
+static bool carregar_kext(const char *dispositivo)
+{
+    char *argv[] = { LOAD_KEXT, NULL };
+    int r = executar_limite(argv, NULL, 0, LIMITE_LOAD_SEGUNDOS);
+    if (r != 0) {
+        registro("detectar %s: kext não carregou (load_%s = %d), fica para o NTFS da Apple", dispositivo, NOME, r);
+        return false;
+    }
+    return true;
 }
 
 int detectar(int argc, char *argv[])
@@ -70,8 +90,12 @@ int detectar(int argc, char *argv[])
     if (c.desligar_driver) {
         return RESPOSTA_NAO_RECONHECIDO;
     }
+    if (!carregar_kext(dispositivo)) {
+        return RESPOSTA_NAO_RECONHECIDO;
+    }
 
-    char rotulo[256];
+    /* rótulo NTFS: até 128 unidades UTF-16 = até 384 bytes em UTF-8 */
+    char rotulo[512];
     ler_rotulo(dispositivo, rotulo, sizeof(rotulo));
     registro("detectar %s: reconhecido, rótulo \"%s\"", dispositivo, rotulo);
     printf("%s", rotulo);

@@ -4,7 +4,12 @@
 [`HACKINTOSH.md`](HACKINTOSH.md).
 
 Testado de ponta a ponta só no Mac do Daniel (Apple Silicon, macOS 27). Mac Intel: pacote compilado para Intel
-e programas testados com o Rosetta, **mas o kext Intel ainda não foi carregado num Intel de verdade**.
+e programas testados com o Rosetta; o kext Intel foi carregado num Intel de verdade em 19/10/2026 (Hackintosh, macOS
+26.6.2, 0.2.1: monta e grava numa imagem de teste). Num Mac Intel de verdade, ainda não.
+
+> **Use a 0.2.1 ou mais nova fora do macOS 27.** O kext da 0.2.0 pedia o kernel do macOS 27 e era recusado nas outras
+> versões, sem pedir aprovação; os discos NTFS sumiam do Finder. Ver
+> [`correcoes/2026-10-19_kext-so-carregava-no-macos-27.md`](../correcoes/2026-10-19_kext-so-carregava-no-macos-27.md).
 
 ## Por que precisa preparar o Mac
 
@@ -16,7 +21,7 @@ estado deste Mac (`csrutil status` → `disabled`).
 O instalador (`.pkg`) e o app também não têm assinatura da Apple, então o macOS bloqueia a abertura até você
 liberar (passo 2).
 
-**Requisitos:** macOS 14 (Sonoma) ou mais novo. Desinstale ou desligue antes outros drivers NTFS (Tuxera,
+**Requisitos:** macOS 14 (Sonoma) ou mais novo (o instalador recusa o 13; o kext declara a KPI do macOS 14). Desinstale ou desligue antes outros drivers NTFS (Tuxera,
 Paragon, macFUSE + ntfs-3g); o app avisa se encontrar algum.
 
 ## 1. Desligar a proteção do sistema (uma vez)
