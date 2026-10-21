@@ -37,8 +37,10 @@ echo "    link simbólico (só mostra; o driver pode recusar o open do próprio 
 "${PROG}" -i "${M}/atalho"
 [ "$(cat "${M}/arquivo.txt")" = "ntfs oficial" ] || { echo "FALHA: o conteúdo do arquivo mudou"; FALHOU=1; }
 
-# open e close no mesmo fufh: se não casarem, o kext reclama no fechamento
-AVISOS="$(log show --start "${INICIO}" --style compact --predicate "eventMessage CONTAINS \"${NOME}: fufh invalid\"" 2>/dev/null \
+# open e close no mesmo fufh: se não casarem, o kext reclama no fechamento. Só o kernel: o próprio "log show" registra
+# os argumentos dele (com o texto procurado) e contava como aviso (20/10/2026).
+AVISOS="$(/usr/bin/log show --start "${INICIO}" --style compact \
+    --predicate "process == \"kernel\" AND eventMessage CONTAINS \"${NOME}: fufh invalid\"" 2>/dev/null \
     | grep -c "fufh invalid" || true)"
 if [ "${AVISOS}" != 0 ]; then echo "FALHA: ${AVISOS} avisos 'fufh invalid' do kext no log"; FALHOU=1; fi
 

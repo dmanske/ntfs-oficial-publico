@@ -93,13 +93,17 @@ Feito em 20/10/2026, no Mac principal, sem carregar o kext novo:
 - Imagem NTFS montada (kext 0.1.1, só listagem): os arquivos aparecem `-rwxrwxrwx`, então o `O_EXEC` do teste é aceito
   e chega ao kext.
 
-**Falta (precisa do kext novo carregado, ou seja, aprovar e reiniciar):**
+**Com o kext novo carregado (Mac principal, macOS 27, chip Apple, 20/10/2026, 22:19):** `instalar.sh --kext-novo`,
+aprovado e reiniciado; `sysctl vfs.generic.ntfsoficial.version.number` = 0.1.2; kext instalado idêntico ao compilado
+(`cmp`).
 
-1. `bash scripts/testar-abrir-so-eventos.sh` (Mac principal ou Hackintosh): abre arquivo, pasta e link numa imagem NTFS
-   do jeito do `smbd`, 100 vezes cada, e procura `fufh invalid` no log. O script se recusa a rodar se o kext carregado
-   não for o `VERSAO_KEXT`: **com o 0.1.1 esse teste derruba o Mac.**
-2. Uso real: no Hackintosh com a 0.2.2, abrir pelo MacBook Air (Finder → Rede) uma pasta compartilhada que esteja num
-   disco NTFS, navegar, abrir e copiar arquivos nos dois sentidos.
+1. ✅ `bash scripts/testar-abrir-so-eventos.sh` passou: 100 aberturas `0x40208000` no arquivo e `0x40308000` na pasta,
+   todas com `read()` = `EBADF` (chegaram ao kext sem leitura nem escrita, o caminho do panic), sem panic e sem aviso
+   do kernel. O link com `O_EXEC` é recusado ("Permission denied"), o que é aceitável. Na primeira rodada o script
+   acusou 1 `fufh invalid`: era a linha do próprio `log show` com os argumentos dele; o filtro passou a olhar só o
+   kernel. O script se recusa a rodar se o kext carregado não for o `VERSAO_KEXT`: **com o 0.1.1 ele derruba o Mac.**
+2. **Falta:** uso real no Hackintosh com a 0.2.2: abrir pelo MacBook Air (Finder → Rede) uma pasta compartilhada que
+   esteja num disco NTFS, navegar, abrir e copiar arquivos nos dois sentidos.
 
 ## Como reverter
 

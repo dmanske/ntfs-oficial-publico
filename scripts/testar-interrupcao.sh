@@ -10,6 +10,9 @@
 #   DRV=<driver>                                  outro driver (padrão: build/out/bin/ntfsoficial)
 # Como: pausa o driver (kill -STOP); o stat A pode ainda ser entregue ao driver antes de ele parar; o stat B fica
 # garantidamente na fila, sem ser enviado. Mata o B, confere que saiu, solta o driver e confere que o disco responde.
+# A e B procuram em pastas diferentes: na mesma pasta o B espera a trava da pasta, presa pelo A, e nem chega ao próprio
+# pedido (visto em 20/10/2026: ps "U", espera de trava, que não se interrompe). Antes de matar, o B tem que estar em
+# "S" (espera interrompível: o msleep com PCATCH do próprio pedido; o wchan do macOS não mostra o nome, só "-").
 # Usa uma imagem de disco em build/teste (nada de disco real), sem sudo. Monta sem "local" e com "nobrowse" para o
 # Spotlight e o Finder não pedirem nada ao disco enquanto o driver está pausado.
 set -euo pipefail
@@ -44,19 +47,25 @@ P="$(hdiutil attach -nomount "${T}/interrupcao.dmg" 2>/dev/null | awk '/Microsof
 "${SAIDA}/bin/mkntfs" -Q -L "TESTE INTERRUPCAO" "$P" > /dev/null 2>&1
 "${DRV}" "$P" "${M}" -o nobrowse,uid="$(id -u)",gid="$(id -g)" > /dev/null 2>&1; sleep 1
 mount | grep -qF " on ${M} (" || { echo "ERRO: o disco de teste não montou em ${M}"; exit 1; }
-printf 'ntfs oficial\n' > "${M}/arquivo.txt"
+printf 'ntfs oficial\n' > "${M}/arquivo.txt"; mkdir "${M}/pasta-a" "${M}/pasta-b"
 DRV_PID="$(pgrep -f -- "${P} ${M}" || true)"
 [ "$(echo "${DRV_PID}" | wc -w | tr -d ' ')" = 1 ] || { echo "ERRO: não achei um driver só para ${M} (${DRV_PID:-nenhum})"; exit 1; }
 
 echo "==> Pausando o driver (${DRV_PID}) e pedindo ao disco"
+# As duas pastas ficam no cache do kernel (nomes e atributos valem 1 s no NTFS-3G): só o nome novo vai ao driver
+stat "${M}/pasta-a" "${M}/pasta-b" > /dev/null
 kill -STOP "${DRV_PID}"
-stat "${M}/nao-existe-a-$$" > /dev/null 2>&1 & A_PID=$!
-sleep 1
-stat "${M}/nao-existe-b-$$" > /dev/null 2>&1 & B_PID=$!
-sleep 1
+stat "${M}/pasta-a/nao-existe-$$" > /dev/null 2>&1 & A_PID=$!
+sleep 0.3
+stat "${M}/pasta-b/nao-existe-$$" > /dev/null 2>&1 & B_PID=$!
+sleep 0.5
+ESTADO_B="$(ps -o stat= -p "${B_PID}" 2>/dev/null | tr -d ' ')"
+echo "    stat A: $(ps -o stat= -p "${A_PID}" | xargs)   stat B: ${ESTADO_B:-saiu}"
 FALHOU=0
 if ! vivo "${B_PID}"; then
     echo "FALHA: o stat B não ficou esperando o driver (o teste não passou pelo caminho do travamento)"; FALHOU=1
+elif [[ "${ESTADO_B}" != S* ]]; then
+    echo "FALHA: o stat B não está na espera interrompível do próprio pedido (ps ${ESTADO_B}, esperado S): o teste não valeu; não matei"; FALHOU=1
 elif [ "${ENSAIO}" = 1 ]; then
     echo "ok    stat B esperando o driver (ensaio: não mato)"
 else

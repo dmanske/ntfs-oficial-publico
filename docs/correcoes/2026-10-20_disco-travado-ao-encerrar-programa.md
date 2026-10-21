@@ -101,9 +101,16 @@ Feito em 20/10/2026, no Mac principal, sem carregar o kext novo:
   respondeu e foi desmontado. Isso confere o roteiro; o ensaio não mata o processo.
 - Os dois testes se recusam a rodar com o kext 0.1.1 (conferido).
 
-**Falta (kext novo carregado):** `bash scripts/testar-interrupcao.sh` (sem `--ensaio`): o `stat` B morto tem que sair em
-até 2 s com o pedido na fila, e o disco tem que responder depois. **Com o kext 0.1.1 esse teste trava o disco de teste
-e um núcleo até reiniciar**; o script confere a versão.
+**Com o kext novo carregado (Mac principal, macOS 27, chip Apple, 20/10/2026, 22:20):** `bash scripts/testar-interrupcao.sh`
+passou **4 vezes em 4**: com o driver pausado, o `stat` B esperando o próprio pedido (estado `S`) foi morto com `kill -9`
+e saiu na hora (antes de soltar o driver); ao soltar, o `stat` A foi respondido e o disco respondeu; nada ficou montado e
+o log do kernel não tem erro do kext. Com o kext 0.1.1, o mesmo passo deixaria o B girando e o disco de teste travado.
+
+A primeira rodada não valeu e mudou o teste: A e B procuravam na **mesma pasta**, e o B ficou em `U` esperando a trava
+da pasta presa pelo A (o mesmo papel do FinderX no relatório; espera de trava não se interrompe, também no Tuxera) e
+só saiu ao soltar o driver. Agora A e B usam pastas diferentes, e o script só mata o B se ele estiver em `S` (o
+`wchan` do macOS não mostra o nome da espera). **Com o kext 0.1.1 este teste trava o disco de teste e um núcleo até
+reiniciar**; o script confere a versão.
 
 ## Como reverter
 
