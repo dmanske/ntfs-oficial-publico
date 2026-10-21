@@ -84,6 +84,8 @@ sozinho depois de reiniciar. Para usar a opção B, precisa de um ajuste (ex.: o
 | O que o instalador fez | `cat /private/var/log/ntfsoficial-instalacao.log` (diz se falta permitir ou se o macOS é incompatível) |
 | Registro da detecção e da montagem | `/usr/bin/log show --last 15m --predicate 'subsystem == "com.danielmanske.ntfsoficial"'` (no zsh, `log` sozinho é um comando interno e não mostra nada) |
 | Disco ficou só leitura pela Apple | falta permitir o kext em Privacidade e Segurança + reiniciar; o registro mostra `kext não carregou (load_ntfsoficial = 1)` |
+| Reinicia sozinho quando outro Mac abre um disco NTFS dele pela rede (o relatório diz `What kind of a flag is this` e `smbd`) | até a 0.2.1 (kext 0.1.1); corrigido na 0.2.2 (kext 0.1.2). Enquanto estiver na 0.2.1, tire os discos NTFS das pastas compartilhadas (Ajustes → Geral → Compartilhamento → Compartilhamento de Arquivos) |
+| Tudo que usa um disco NTFS para de responder (Finder, FinderX, Spotlight, o app NTFS Oficial) e só volta reiniciando | até a 0.2.1: um programa foi encerrado enquanto esperava o disco e o kext entrou num laço. Corrigido na 0.2.2 (kext 0.1.2). Na 0.2.1, reinicie |
 
 ## Compilar no Hackintosh (Intel)
 
@@ -98,4 +100,10 @@ arm64. Para instalar, prefira o `.pkg` da Release: é o que foi testado.
   `WARNING: Dirty volume mount was forced…`. Corrigido na 0.2.1.
 - **19/10/2026, 0.2.1:** testada aqui e no Mac com chip Apple com o mesmo pacote, e publicada. Durante o teste, os discos
   montados no boot ficavam em nome de `root`/`_windowserver` (o `git` recusava); corrigido antes de publicar (dono 99).
+- **20/10/2026, 0.2.1: kernel panic ao compartilhar.** Abrir pelo MacBook Air (Finder → Rede) uma pasta do Hackintosh
+  num disco NTFS fazia o Hackintosh reiniciar: o `smbd` abre os arquivos sem leitura nem escrita (`O_EVTONLY`) e o kext
+  dava panic. No outro sentido funcionava. Corrigido na 0.2.2 (kext 0.1.2), ainda sem teste aqui.
+- **20/10/2026, 0.2.1: disco travado.** O FinderX, o Spotlight e o app NTFS Oficial pararam em um dos discos NTFS: o
+  ajudante de espelhar telas dos Ajustes foi encerrado enquanto esperava o disco e o kext ficou girando com a trava
+  do pedido, sem deixar o driver trabalhar. Corrigido na 0.2.2 (kext 0.1.2), ainda sem teste aqui.
 - 17/10/2026: guia escrito antes do primeiro teste.

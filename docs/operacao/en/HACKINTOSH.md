@@ -84,6 +84,8 @@ Oficial service setting both `sysctl` values at startup). That's why option A is
 | What the installer did | `cat /private/var/log/ntfsoficial-instalacao.log` (says whether you still need to allow the kext or the macOS is incompatible) |
 | Detection and mount log | `/usr/bin/log show --last 15m --predicate 'subsystem == "com.danielmanske.ntfsoficial"'` (in zsh, plain `log` is a built-in and shows nothing) |
 | Drive became read-only through Apple's driver | the kext still needs to be allowed in Privacy & Security + restart; the log shows `kext não carregou (load_ntfsoficial = 1)` ("kext didn't load") |
+| Restarts by itself when another Mac opens one of its NTFS drives over the network (the report says `What kind of a flag is this` and `smbd`) | up to 0.2.1 (kext 0.1.1); fixed in 0.2.2 (kext 0.1.2). While on 0.2.1, remove the NTFS drives from the shared folders (System Settings → General → Sharing → File Sharing) |
+| Everything that uses an NTFS drive stops responding (Finder, FinderX, Spotlight, the NTFS Oficial app) and only a restart brings it back | up to 0.2.1: a program was quit while it was waiting for the drive and the kext got stuck in a loop. Fixed in 0.2.2 (kext 0.1.2). On 0.2.1, restart |
 
 ## Building on a Hackintosh (Intel)
 
@@ -98,4 +100,10 @@ prefer the `.pkg` from the Release: that's the one that was tested.
   the warning `WARNING: Dirty volume mount was forced…`. Fixed in 0.2.1.
 - **19/10/2026, 0.2.1:** tested here and on an Apple-silicon Mac with the same package, and released. During testing,
   drives mounted at boot were owned by `root`/`_windowserver` (`git` refused them); fixed before release (owner 99).
+- **20/10/2026, 0.2.1: kernel panic when sharing.** Opening a Hackintosh folder on an NTFS drive from the MacBook Air
+  (Finder → Network) made the Hackintosh restart: `smbd` opens the files with neither read nor write (`O_EVTONLY`)
+  and the kext panicked. The other direction worked. Fixed in 0.2.2 (kext 0.1.2), not yet tested here.
+- **20/10/2026, 0.2.1: drive stuck.** FinderX, Spotlight and the NTFS Oficial app froze on one of the NTFS drives:
+  the display mirroring helper from System Settings was quit while it was waiting for the drive, and the kext kept
+  spinning with the request's lock, never letting the driver work. Fixed in 0.2.2 (kext 0.1.2), not yet tested here.
 - 17/10/2026: guide written before the first test.

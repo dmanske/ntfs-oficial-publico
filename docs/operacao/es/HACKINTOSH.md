@@ -84,6 +84,8 @@ el servicio de NTFS Oficial escriba los dos `sysctl` al arrancar). Por eso la re
 | Qué hizo el instalador | `cat /private/var/log/ntfsoficial-instalacao.log` (dice si falta permitir el kext o si el macOS es incompatible) |
 | Registro de la detección y del montaje | `/usr/bin/log show --last 15m --predicate 'subsystem == "com.danielmanske.ntfsoficial"'` (en zsh, `log` solo es un comando interno y no muestra nada) |
 | El disco quedó en solo lectura con el controlador de Apple | falta permitir el kext en Privacidad y seguridad + reiniciar; el registro muestra `kext não carregou (load_ntfsoficial = 1)` ("el kext no cargó") |
+| Se reinicia solo cuando otro Mac abre uno de sus discos NTFS por la red (el informe dice `What kind of a flag is this` y `smbd`) | hasta la 0.2.1 (kext 0.1.1); corregido en la 0.2.2 (kext 0.1.2). Mientras estés en la 0.2.1, quita los discos NTFS de las carpetas compartidas (Ajustes del Sistema → General → Compartir → Compartir archivos) |
+| Todo lo que usa un disco NTFS deja de responder (Finder, FinderX, Spotlight, la app NTFS Oficial) y solo vuelve reiniciando | hasta la 0.2.1: un programa se cerró mientras esperaba el disco y el kext entró en un bucle. Corregido en la 0.2.2 (kext 0.1.2). En la 0.2.1, reinicia |
 
 ## Compilar en un Hackintosh (Intel)
 
@@ -99,4 +101,12 @@ instalar, mejor el `.pkg` de la Release: es el que se probó.
 - **19/10/2026, 0.2.1:** probada aquí y en un Mac con chip de Apple con el mismo paquete, y publicada. Durante la
   prueba, los discos montados al arrancar quedaban a nombre de `root`/`_windowserver` (`git` los rechazaba); corregido
   antes de publicar (dueño 99).
+- **20/10/2026, 0.2.1: kernel panic al compartir.** Abrir desde el MacBook Air (Finder → Red) una carpeta del
+  Hackintosh en un disco NTFS hacía que el Hackintosh se reiniciara: `smbd` abre los archivos sin lectura ni escritura
+  (`O_EVTONLY`) y el kext entraba en panic. En el otro sentido funcionaba. Corregido en la 0.2.2 (kext 0.1.2), aún
+  sin probar aquí.
+- **20/10/2026, 0.2.1: disco trabado.** FinderX, Spotlight y la app NTFS Oficial se quedaron parados en uno de los
+  discos NTFS: el ayudante de duplicar pantallas de los Ajustes se cerró mientras esperaba el disco y el kext siguió
+  girando con el bloqueo de la petición, sin dejar trabajar al controlador. Corregido en la 0.2.2 (kext 0.1.2), aún
+  sin probar aquí.
 - 17/10/2026: guía escrita antes de la primera prueba.

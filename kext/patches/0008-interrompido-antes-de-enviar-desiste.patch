@@ -1,0 +1,57 @@
+--- a/kext/osxfuse/fuse_ipc.c
++++ b/kext/osxfuse/fuse_ipc.c
+@@ -249,6 +249,23 @@
+              */
+             ftick->tk_aw_ohead.error = err_interrupt;
+         }
++        goto out;
++    }
++
++    if ((err == EINTR || err == ERESTART) && !fticket_sent(ftick)) {
++        /*
++         * ntfsoficial: interrompido por sinal antes de o driver receber o pedido: desiste na hora (o driver pula
++         * pedidos já respondidos, fuse_device_read). Antes só desistia se fuse_kludge_thread_should_abort() visse
++         * TH_SFLAG_ABORT, lendo a thread num deslocamento fixo do macOS 10.14 que no macOS 26/27 é outro campo.
++         * Com o processo encerrado, o msleep com PCATCH volta na hora e isto girava para sempre segurando o tk_mtx;
++         * o driver, parado no fuse_lck_mtx_lock(ftick->tk_mtx) do fuse_device_read, nunca marcava o pedido como
++         * enviado e o disco inteiro travava (Hackintosh, MirrorDisplays, 20/10/2026). O Tuxera desiste em qualquer
++         * EINTR (FUN_000089e0: só repete o msleep no EWOULDBLOCK; no EINTR manda FUSE_INTERRUPT, FUN_00007334, e
++         * sai). Aqui, pedido já enviado continua como no osxfuse 3: FUSE_INTERRUPT e espera dormindo, sem PCATCH.
++         * Fica antes do EWOULDBLOCK de propósito: o EINTR que ele cria é do tempo limite, não de sinal.
++         */
++        fticket_set_answered(ftick);
++        remove_callback = true;
+         goto out;
+     }
+ 
+@@ -275,13 +292,6 @@
+     }
+ 
+     if (err == EINTR || err == ERESTART) {
+-        if (!fticket_sent(ftick)
+-            && fuse_kludge_thread_should_abort(current_thread())) {
+-            fticket_set_answered(ftick);
+-            remove_callback = true;
+-            goto out;
+-        }
+-
+         if (!fticket_interrupted(ftick)) {
+             fticket_set_interrupted(ftick);
+             err_interrupt = err;
+--- a/kext/osxfuse/fuse_locking.c
++++ b/kext/osxfuse/fuse_locking.c
+@@ -82,7 +82,13 @@
+                          "fuse_getattr", NULL);
+             if (err == 0) {
+                 goto restart;
+-            } else if (err == EINTR && fuse_kludge_thread_should_abort(thread)) {
++            } else {
++                /*
++                 * ntfsoficial: qualquer interrupção sai (o nó já está destravado e o fuse_nodelock_lock devolve o
++                 * erro). Antes só saía se fuse_kludge_thread_should_abort() acertasse, e ela lê a thread num
++                 * deslocamento fixo do macOS 10.14; no resto, repetia o msleep com o getattr_lock já solto pelo
++                 * PDROP. Mesma causa do travamento de 20/10/2026 (fuse_ipc.c, fticket_wait_answer).
++                 */
+                 goto out;
+             }
+         }

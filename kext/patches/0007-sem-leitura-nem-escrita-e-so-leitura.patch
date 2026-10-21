@@ -1,0 +1,26 @@
+--- a/kext/osxfuse/fuse_file.h
++++ b/kext/osxfuse/fuse_file.h
+@@ -73,15 +73,16 @@
+          * that kext intends to do anyway. Lets hope the
+          * calls to VNOP_OPEN and VNOP_CLOSE do match up
+          * even with this fudging.
++         *
++         * ntfsoficial: sem FREAD e sem FWRITE é sempre só leitura, nunca panic. O kernel tira os dois bits
++         * de quem abre com O_EVTONLY e ligou IOPOL_VFS_DISALLOW_RW_FOR_O_EVTONLY (open1, vfs_syscalls.c):
++         * o smbd do compartilhamento de arquivos abre assim (0x208000 = O_SYMLINK | O_EVTONLY) e o
++         * Hackintosh reiniciava quando outro Mac abria um disco NTFS pela rede (20/10/2026). O Tuxera faz o
++         * mesmo no open (FUN_0000ea2c, 0xeb24-0xeb44) e no close (FUN_0000bfc8), sem panic; open e close
++         * caem no mesmo fufh, então as contagens continuam casando.
+          */
+-        if (fflags == 0) {
+-            return FUFH_RDONLY;
+-        } else {
+-            panic("ntfsoficial: What kind of a flag is this (%x)?", fflags);
+-        }
++        return FUFH_RDONLY;
+     }
+-
+-    return FUFH_INVALID;
+ }
+ 
+ FUSE_INLINE

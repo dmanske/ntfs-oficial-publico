@@ -7,7 +7,7 @@ NOME="ntfsoficial"
 NOME_EXIBICAO="NTFSOficial"
 # Prefixo dos identificadores (kext: ${IDENTIFICADOR}.filesystems.${NOME})
 IDENTIFICADOR="com.danielmanske.ntfsoficial"
-VERSAO="0.2.1"
+VERSAO="0.2.2"
 # Versão do kext: vai para o kext (sysctl version.number) e para o load_/mount_ntfsoficial, que recusam montar se
 # ela for diferente da do kext carregado ("mismatched version"). Só mude quando o código do kext mudar: kext novo
 # exige aprovar em Ajustes e reiniciar, e o instalar.sh mantém o kext já aprovado. Separada da VERSAO desde
@@ -15,7 +15,9 @@ VERSAO="0.2.1"
 #   0.1.0  kext da fase 0 (patches 0001-0004)
 #   0.1.1  + 0005: anuncia "renomear volume" (18/10/2026)
 #          0.1.1 também na 0.2.1: mesmo código, Info.plist com KPI_MINIMO (antes 27.0.0)
-VERSAO_KEXT="0.1.1"
+#   0.1.2  + 0007: abrir sem leitura nem escrita (O_EVTONLY do smbd) vira só leitura, não panic (20/10/2026)
+#          + 0008: pedido interrompido antes de o driver recebê-lo desiste na hora (travava o disco, 20/10/2026)
+VERSAO_KEXT="0.1.2"
 
 # macOS mínimo: KPI que o kext declara (OSBundleLibraries) e versão que o instalador exige.
 # Os dois são macOS 14 = Darwin 23; mudar juntos; não há fórmula (macOS 26 = Darwin 25, macOS 27 = Darwin 27);
