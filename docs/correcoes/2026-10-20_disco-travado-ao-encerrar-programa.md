@@ -112,6 +112,12 @@ só saiu ao soltar o driver. Agora A e B usam pastas diferentes, e o script só 
 `wchan` do macOS não mostra o nome da espera). **Com o kext 0.1.1 este teste trava o disco de teste e um núcleo até
 reiniciar**; o script confere a versão.
 
+**Uso real no Hackintosh (kext 0.1.2 carregado desde 20/10/2026, 20:48; conferido em 22/10/2026):** o Compartilhamento
+de Tela e o compartilhamento de arquivos pelo MacBook Air funcionaram, sem disco travado. Nenhum relatório de
+travamento (`.hang`) depois da instalação; o único (`ExplorerMacApp`, 20/10/2026, 20:10) é de antes, com o kext 0.1.1.
+A corrida em si (programa encerrado com o pedido ainda na fila) é rara e não dá para provocar no uso normal: quem a
+confere é o `testar-interrupcao.sh` acima.
+
 ## Como reverter
 
 Apagar `kext/patches/0008-interrompido-antes-de-enviar-desiste.patch` e tirar a linha `+ 0008` do comentário do

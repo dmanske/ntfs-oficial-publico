@@ -66,7 +66,7 @@ Detalhes em [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) e [`docs/modulos/`](doc
 
 | Versão | Data | O que mudou |
 |---|---|---|
-| 0.2.2 | 20/10/2026 | Correção: o Mac que compartilha um disco NTFS pela rede (Compartilhamento de Arquivos) reiniciava sozinho (kernel panic) quando outro Mac abria o disco. Agora funciona. Disco NTFS que travava até reiniciar quando um programa era fechado enquanto esperava por ele. Extensão de kernel 0.1.2: precisa aprovar de novo e reiniciar. **Pré-lançamento, em teste** |
+| 0.2.2 | 20/10/2026 | Correção: o Mac que compartilha um disco NTFS pela rede (Compartilhamento de Arquivos) reiniciava sozinho (kernel panic) quando outro Mac abria o disco. Agora funciona. Disco NTFS que travava até reiniciar quando um programa era fechado enquanto esperava por ele. Extensão de kernel 0.1.2: precisa aprovar de novo e reiniciar. Testada no Mac com chip Apple e no Hackintosh, com compartilhamento entre dois Macs |
 | 0.2.1 | 19/10/2026 | Correção: a extensão de kernel da 0.2.0 só carregava no macOS 27 (nos outros, os discos NTFS sumiam do Finder). Agora carrega a partir do macOS 14; se não carregar, o disco fica com o NTFS da Apple (só leitura); nome do volume certo em disco que o Windows deixou sujo; o instalador diz o motivo quando a extensão não carrega; disco montado antes do login não fica mais em nome do sistema |
 | 0.2.0 | 18/10/2026 | Disco sujo do Windows montado com gravação; Finder (ocultos, cadeado, data de criação, renomear volume); nomes SFM; Utilitário de Disco; correções (nada montava depois da 0.1.1; disco com espaço no nome não era desmontado ao desligar). Kext 0.1.1: precisa aprovar de novo e reiniciar |
 | 0.1.1 | 17/10/2026 | App não some mais em segundo plano |
@@ -103,7 +103,7 @@ Security), or right-click → Open. Download the `.pkg` from Releases, install, 
 Security and restart. GPL-2.0.
 
 Full guides in English: [installing on a Mac](docs/operacao/en/INSTALL.md) and
-[Hackintosh (OpenCore)](docs/operacao/en/HACKINTOSH.md). Tested with 0.2.1 on an Apple-silicon Mac (macOS 27) and an
+[Hackintosh (OpenCore)](docs/operacao/en/HACKINTOSH.md). Tested with 0.2.1 and 0.2.2 on an Apple-silicon Mac (macOS 27) and an
 Intel Hackintosh (macOS 26.6.2); not yet on AMD, macOS 14/15 or a real Intel Mac. Bug reports and test results:
 [issues](https://github.com/dmanske/ntfs-oficial-publico/issues).
 
@@ -112,7 +112,7 @@ Intel Hackintosh (macOS 26.6.2); not yet on AMD, macOS 14/15 or a real Intel Mac
 Lectura y escritura de NTFS en macOS, sin macFUSE, Tuxera ni Paragon. Instalador universal (chip de Apple e Intel),
 macOS 14 o más nuevo. Usa su propia extensión de kernel sin el certificado de Apple, así que **hay que desactivar el
 SIP** (en un Hackintosh, por el `csr-active-config` de OpenCore). Guías completas: [instalar en un
-Mac](docs/operacao/es/INSTALAR.md) y [Hackintosh (OpenCore)](docs/operacao/es/HACKINTOSH.md). Probado con la 0.2.1 en un
+Mac](docs/operacao/es/INSTALAR.md) y [Hackintosh (OpenCore)](docs/operacao/es/HACKINTOSH.md). Probado con la 0.2.1 y la 0.2.2 en un
 Mac con chip de Apple (macOS 27) y en un Hackintosh Intel (macOS 26.6.2). Errores y resultados de pruebas:
 [issues](https://github.com/dmanske/ntfs-oficial-publico/issues). GPL-2.0.
 

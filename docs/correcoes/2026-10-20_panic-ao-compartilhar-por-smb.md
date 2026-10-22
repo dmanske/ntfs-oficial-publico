@@ -21,6 +21,19 @@ Kernel Extensions in backtrace: com.danielmanske.ntfsoficial.filesystems.ntfsofi
 (`_fuse_isnoreadahead` é só o símbolo exportado mais próximo: a função de verdade é o `fuse_vnop_open`, com a tradução
 dos flags embutida.)
 
+O primeiro panic do dia (14:12, também `smbd`) tem o flag `0x8100`; o segundo (19:14), o `0x208000` acima. Os dois com o
+sistema ligado havia mais de 4 h (uptime 16099 s e 17844 s).
+
+Conferido em 22/10/2026 no kext x86_64 da Release 0.2.1, de UUID `71E49789-…` (o mesmo do relatório; `otool -tV`,
+endereços do arquivo = endereço do relatório − base `0xffffff7f9696b000`):
+
+- `0x…71824 − base = 0x6824`: instrução logo depois do `callq _fuse_vnop_open` em `_fuse_biglock_vnop_open`
+  (`0x67c8 + 0x5c`).
+- `0x…75a8d − base = 0xaa8d`: o `callq _panic` em `0xaa88` é a **última instrução** do `_fuse_vnop_open` (o `panic` não
+  volta), então o endereço de retorno cai no começo da função seguinte, `_fuse_isnoreadahead` (`0xaa8d`). Por isso o
+  relatório mostra esse nome sem `+ deslocamento`.
+- O desvio para o `panic` é a tradução embutida: `mode & 3 == 0` e `mode != 0` → `jne 0xaa7c` → `panic`.
+
 ## Causa
 
 1. Quem atende a rede é o `smbd` do Mac que **compartilha**. Ao navegar nas pastas, ele abre os arquivos só para
@@ -33,8 +46,10 @@ dos flags embutida.)
        flags &= ~(FREAD | FWRITE);
    }
    ```
-3. A conta: `0x208000 = 0x200000 (O_SYMLINK) + 0x8000 (O_EVTONLY)`, sem `FREAD (0x1)` e sem `FWRITE (0x2)`
-   (valores de `sys/fcntl.h`).
+3. A conta: `0x208000 = 0x200000 (O_SYMLINK) + 0x8000 (O_EVTONLY)` e `0x8100 = 0x8000 (O_EVTONLY) + 0x100
+   (O_NOFOLLOW)`, os dois sem `FREAD (0x1)` e sem `FWRITE (0x2)` (valores de `sys/fcntl.h`). Sem a política, um
+   `O_RDONLY` chegaria com `FREAD`: o kernel soma 1 (`FFLAGS(oflags) = oflags + 1`, `sys/fcntl.h` do Kernel.framework),
+   e daria `0x8101`.
 4. O osxfuse 3 (`kext/osxfuse/fuse_file.h`, `fuse_filehandle_xlate_from_fflags`) só aceitava "sem leitura nem
    escrita" se o flag fosse exatamente 0; qualquer outro valor caía em `panic("… What kind of a flag is this (%x)?")`.
    A função é usada no open, no close e no ioctl.
@@ -102,8 +117,10 @@ aprovado e reiniciado; `sysctl vfs.generic.ntfsoficial.version.number` = 0.1.2; 
    do kernel. O link com `O_EXEC` é recusado ("Permission denied"), o que é aceitável. Na primeira rodada o script
    acusou 1 `fufh invalid`: era a linha do próprio `log show` com os argumentos dele; o filtro passou a olhar só o
    kernel. O script se recusa a rodar se o kext carregado não for o `VERSAO_KEXT`: **com o 0.1.1 ele derruba o Mac.**
-2. **Falta:** uso real no Hackintosh com a 0.2.2: abrir pelo MacBook Air (Finder → Rede) uma pasta compartilhada que
-   esteja num disco NTFS, navegar, abrir e copiar arquivos nos dois sentidos.
+2. ✅ **Uso real no Hackintosh com a 0.2.2** (kext 0.1.2 carregado desde 20/10/2026, 20:48; conferido pelo Daniel até
+   22/10/2026): pelo MacBook Air (Finder → Rede), as pastas compartilhadas nos discos NTFS (DADOS 1 1TB, DADOS 2 1TB e
+   3TB) abriram, navegaram, e arquivos foram abertos e copiados nos dois sentidos, sem reinício. Nenhum relatório de
+   panic em `/Library/Logs/DiagnosticReports` depois dos dois de 20/10/2026 (14:12 e 19:14, kext 0.1.1).
 
 ## Como reverter
 

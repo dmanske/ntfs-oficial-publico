@@ -102,8 +102,10 @@ arm64. Para instalar, prefira o `.pkg` da Release: é o que foi testado.
   montados no boot ficavam em nome de `root`/`_windowserver` (o `git` recusava); corrigido antes de publicar (dono 99).
 - **20/10/2026, 0.2.1: kernel panic ao compartilhar.** Abrir pelo MacBook Air (Finder → Rede) uma pasta do Hackintosh
   num disco NTFS fazia o Hackintosh reiniciar: o `smbd` abre os arquivos sem leitura nem escrita (`O_EVTONLY`) e o kext
-  dava panic. No outro sentido funcionava. Corrigido na 0.2.2 (kext 0.1.2), ainda sem teste aqui.
+  dava panic. No outro sentido funcionava. Corrigido na 0.2.2 (kext 0.1.2), **testado aqui em 22/10/2026**: pelo
+  MacBook Air, os discos NTFS compartilhados abrem, navegam e copiam nos dois sentidos, sem reinício.
 - **20/10/2026, 0.2.1: disco travado.** O FinderX, o Spotlight e o app NTFS Oficial pararam em um dos discos NTFS: o
   ajudante de espelhar telas dos Ajustes foi encerrado enquanto esperava o disco e o kext ficou girando com a trava
-  do pedido, sem deixar o driver trabalhar. Corrigido na 0.2.2 (kext 0.1.2), ainda sem teste aqui.
+  do pedido, sem deixar o driver trabalhar. Corrigido na 0.2.2 (kext 0.1.2). **Usado aqui até 22/10/2026** (inclusive
+  o Compartilhamento de Tela) sem travar disco.
 - 17/10/2026: guia escrito antes do primeiro teste.

@@ -103,10 +103,11 @@ instalar, mejor el `.pkg` de la Release: es el que se probó.
   antes de publicar (dueño 99).
 - **20/10/2026, 0.2.1: kernel panic al compartir.** Abrir desde el MacBook Air (Finder → Red) una carpeta del
   Hackintosh en un disco NTFS hacía que el Hackintosh se reiniciara: `smbd` abre los archivos sin lectura ni escritura
-  (`O_EVTONLY`) y el kext entraba en panic. En el otro sentido funcionaba. Corregido en la 0.2.2 (kext 0.1.2), aún
-  sin probar aquí.
+  (`O_EVTONLY`) y el kext entraba en panic. En el otro sentido funcionaba. Corregido en la 0.2.2 (kext 0.1.2),
+  **probado aquí el 22/10/2026**: desde el MacBook Air, los discos NTFS compartidos se abren, se navegan y copian en
+  los dos sentidos, sin reinicio.
 - **20/10/2026, 0.2.1: disco trabado.** FinderX, Spotlight y la app NTFS Oficial se quedaron parados en uno de los
   discos NTFS: el ayudante de duplicar pantallas de los Ajustes se cerró mientras esperaba el disco y el kext siguió
-  girando con el bloqueo de la petición, sin dejar trabajar al controlador. Corregido en la 0.2.2 (kext 0.1.2), aún
-  sin probar aquí.
+  girando con el bloqueo de la petición, sin dejar trabajar al controlador. Corregido en la 0.2.2 (kext 0.1.2).
+  **Usada aquí hasta el 22/10/2026** (incluido Compartir Pantalla) sin que se trabe ningún disco.
 - 17/10/2026: guía escrita antes de la primera prueba.

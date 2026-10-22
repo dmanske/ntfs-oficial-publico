@@ -102,8 +102,10 @@ prefer the `.pkg` from the Release: that's the one that was tested.
   drives mounted at boot were owned by `root`/`_windowserver` (`git` refused them); fixed before release (owner 99).
 - **20/10/2026, 0.2.1: kernel panic when sharing.** Opening a Hackintosh folder on an NTFS drive from the MacBook Air
   (Finder → Network) made the Hackintosh restart: `smbd` opens the files with neither read nor write (`O_EVTONLY`)
-  and the kext panicked. The other direction worked. Fixed in 0.2.2 (kext 0.1.2), not yet tested here.
+  and the kext panicked. The other direction worked. Fixed in 0.2.2 (kext 0.1.2), **tested here on 22/10/2026**:
+  from the MacBook Air, the shared NTFS drives open, browse and copy in both directions, with no restart.
 - **20/10/2026, 0.2.1: drive stuck.** FinderX, Spotlight and the NTFS Oficial app froze on one of the NTFS drives:
   the display mirroring helper from System Settings was quit while it was waiting for the drive, and the kext kept
-  spinning with the request's lock, never letting the driver work. Fixed in 0.2.2 (kext 0.1.2), not yet tested here.
+  spinning with the request's lock, never letting the driver work. Fixed in 0.2.2 (kext 0.1.2). **Used here up to
+  22/10/2026** (Screen Sharing included) with no stuck drive.
 - 17/10/2026: guide written before the first test.
