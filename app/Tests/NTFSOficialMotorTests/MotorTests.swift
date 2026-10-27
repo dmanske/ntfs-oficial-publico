@@ -167,9 +167,12 @@ final class ProbeETMotivoTests: XCTestCase {
         try "hibernado".write(toFile: pasta + "/disk9s1.motivo", atomically: true, encoding: .utf8)
         try "sujo\n".write(toFile: pasta + "/disk9s2.motivo", atomically: true, encoding: .utf8)
         try "bobagem".write(toFile: pasta + "/disk9s3.motivo", atomically: true, encoding: .utf8)
+        try "cache-windows\n".write(toFile: pasta + "/disk9s4.motivo", atomically: true, encoding: .utf8)
         XCTAssertEqual(Disco.lerMotivo(bsdName: "disk9s1", pasta: pasta), .hibernado)
         XCTAssertEqual(Disco.lerMotivo(bsdName: "disk9s2", pasta: pasta), .sujo)
         XCTAssertNil(Disco.lerMotivo(bsdName: "disk9s3", pasta: pasta))
+        XCTAssertEqual(Disco.lerMotivo(bsdName: "disk9s4", pasta: pasta), .cacheWindows)
+        XCTAssertEqual(MotivoSoLeitura.cacheWindows.rawValue, "cache-windows")
     }
 }
 

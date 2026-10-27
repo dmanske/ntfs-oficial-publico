@@ -2,7 +2,7 @@
 
 App de barra de menus em SwiftUI (macOS 14+), sem ícone no Dock. Desenho aprovado em
 [`design/DESIGN_FASE2_APP.md`](../design/DESIGN_FASE2_APP.md). O app **não mexe no driver**: lista discos, chama ações
-e mostra estado. Versão 0.1.0 (`app/Sources/NTFSOficial/Shared/Config.swift`).
+e mostra estado. Versão lida do `CFBundleShortVersionString` do Info.plist (desde a 0.2.3; `Config.versao` em `app/Sources/NTFSOficial/Shared/Config.swift`).
 
 ## Estrutura (`app/`, pacote Swift sem dependências externas)
 
@@ -18,7 +18,13 @@ e mostra estado. Versão 0.1.0 (`app/Sources/NTFSOficial/Shared/Config.swift`).
   Entra se o tipo for `ntfsoficial`/`ntfs`; não montado só se o conteúdo for `Windows_NTFS` (o GUID `EBD0A0A2…` é de
   exFAT/FAT também, então sozinho não basta). Espaço e só leitura vêm do `statfs`. O motivo do só leitura vem de
   `/private/var/tmp/ntfsoficial/<disco>.motivo` (escrito pelo despachante de montagem); só leitura com tipo `ntfs`
-  (Apple) = "outro driver". A lista é relida a cada 15 s (`Config.intervaloAtualizacao`) para atualizar o espaço livre.
+  (Apple) = "outro driver". Motivos (`MotivoSoLeitura` em `Disco.swift`): `hibernado`, `cache-windows` (Inicialização rápida do Windows, novo na 0.2.3) e `sujo`. A lista é relida a cada 15 s (`Config.intervaloAtualizacao`) para atualizar o espaço livre.
+- **Selo e explicação no detalhe do disco:** o selo de só leitura mostra o motivo ("Só leitura — Inicialização rápida do
+  Windows" / "Windows Fast Startup" no caso novo). Embaixo do selo há uma linha de explicação (`.callout`, cor
+  secundária, `Formatacao.explicacao`) com o mesmo texto do Verificar: `verHibernado`, `verCacheWindows` (manda usar
+  Reiniciar no Windows ou `powercfg /h off`) e `verSujo`.
+- **Versão:** `Config.versao` lê o Info.plist do app, que o `scripts/montar-app.sh` grava com a `VERSAO` de
+  `scripts/config.sh`; no `swift run` (sem Info.plist) aparece "dev". Até a 0.2.2 era fixa e o rodapé mostrava 0.1.1.
 - **Montar/desmontar/ejetar:** DiskArbitration, sem senha. Se falhar, o alerta mostra o texto do dissenter e oferece
   "Forçar" (botão vermelho).
 - **Verificar:** desmonta, roda como administrador `ntfs-3g.probe --readwrite` + `ntfsrecover -n` (só se o probe disser

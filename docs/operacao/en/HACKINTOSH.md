@@ -86,6 +86,7 @@ Oficial service setting both `sysctl` values at startup). That's why option A is
 | Drive became read-only through Apple's driver | the kext still needs to be allowed in Privacy & Security + restart; the log shows `kext não carregou (load_ntfsoficial = 1)` ("kext didn't load") |
 | Restarts by itself when another Mac opens one of its NTFS drives over the network (the report says `What kind of a flag is this` and `smbd`) | up to 0.2.1 (kext 0.1.1); fixed in 0.2.2 (kext 0.1.2). While on 0.2.1, remove the NTFS drives from the shared folders (System Settings → General → Sharing → File Sharing) |
 | Everything that uses an NTFS drive stops responding (Finder, FinderX, Spotlight, the NTFS Oficial app) and only a restart brings it back | up to 0.2.1: a program was quit while it was waiting for the drive and the kext got stuck in a loop. Fixed in 0.2.2 (kext 0.1.2). On 0.2.1, restart |
+| After using Shut down in Windows, the NTFS disks are read-only and the app says "Windows Fast Startup" (up to 0.2.2 it wrongly said "unplugged without ejecting") | It's Windows Fast Startup: Shut down doesn't fully close the disks. To go to macOS, use **Restart** in Windows (not Shut down) and pick macOS in OpenCore. To stop it for good: Command Prompt as administrator → `powercfg /h off`. Restarting the Mac doesn't help |
 
 ## Building on a Hackintosh (Intel)
 

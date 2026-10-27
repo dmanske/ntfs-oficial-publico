@@ -86,6 +86,7 @@ el servicio de NTFS Oficial escriba los dos `sysctl` al arrancar). Por eso la re
 | El disco quedó en solo lectura con el controlador de Apple | falta permitir el kext en Privacidad y seguridad + reiniciar; el registro muestra `kext não carregou (load_ntfsoficial = 1)` ("el kext no cargó") |
 | Se reinicia solo cuando otro Mac abre uno de sus discos NTFS por la red (el informe dice `What kind of a flag is this` y `smbd`) | hasta la 0.2.1 (kext 0.1.1); corregido en la 0.2.2 (kext 0.1.2). Mientras estés en la 0.2.1, quita los discos NTFS de las carpetas compartidas (Ajustes del Sistema → General → Compartir → Compartir archivos) |
 | Todo lo que usa un disco NTFS deja de responder (Finder, FinderX, Spotlight, la app NTFS Oficial) y solo vuelve reiniciando | hasta la 0.2.1: un programa se cerró mientras esperaba el disco y el kext entró en un bucle. Corregido en la 0.2.2 (kext 0.1.2). En la 0.2.1, reinicia |
+| Después de usar Apagar en Windows, los discos NTFS quedan de solo lectura y la app dice "Windows Fast Startup" ("Inicialização rápida do Windows" en portugués; hasta la 0.2.2 decía, por error, que se desconectó sin expulsar) | Es el Inicio rápido de Windows: Apagar no cierra los discos del todo. Para ir a macOS, usa **Reiniciar** en Windows (no Apagar) y elige macOS en OpenCore. Para que no vuelva a pasar: Símbolo del sistema como administrador → `powercfg /h off`. Reiniciar el Mac no lo arregla |
 
 ## Compilar en un Hackintosh (Intel)
 

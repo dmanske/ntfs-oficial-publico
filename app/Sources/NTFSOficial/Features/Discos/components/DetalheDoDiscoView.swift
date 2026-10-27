@@ -42,6 +42,10 @@ struct DetalheDoDiscoView: View {
                 Spacer()
                 botoes
             }
+            if disco.montado, disco.soLeitura, let explicacao = Formatacao.explicacao(disco.motivoSoLeitura) {
+                Text(explicacao).font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 

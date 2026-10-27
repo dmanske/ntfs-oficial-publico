@@ -120,7 +120,7 @@ static bool esperar_montado(const char *ponto, int segundos)
 }
 
 /* Guarda o motivo do "só leitura" para o app NTFS Oficial mostrar (contrato:
- * ESTADO_DIR/<disco>.motivo com "hibernado" ou "sujo"; sem arquivo = montado normalmente). */
+ * ESTADO_DIR/<disco>.motivo com "hibernado", "cache-windows" ou "sujo"; sem arquivo = montado normalmente). */
 #define ESTADO_DIR "/private/var/tmp/" NOME
 static void gravar_motivo(const char *dispositivo, const char *motivo)
 {
@@ -136,12 +136,32 @@ static void gravar_motivo(const char *dispositivo, const char *motivo)
     if (f) { fputs(motivo, f); fclose(f); chmod(caminho, 0644); }
 }
 
-/* Por que o disco ficou só para leitura (muda só o texto do aviso; o app lê "hibernado" ou "sujo"). */
+/* Por que o disco ficou só para leitura (muda o texto do aviso e o que o app lê no arquivo .motivo). */
 typedef enum {
-    MOTIVO_HIBERNADO,          /* Windows hibernado / inicialização rápida (hiberfil.sys) */
+    MOTIVO_HIBERNADO,          /* Windows hibernado (hiberfil.sys; com a Inicialização rápida, é o disco do Windows) */
+    MOTIVO_CACHE_WINDOWS,      /* journal 2.0: Inicialização rápida nos outros discos (ou disco arrancado do Windows 8+) */
     MOTIVO_SUJO,               /* journal pendente e a recuperação automática está desligada */
-    MOTIVO_RECUPERACAO_FALHOU  /* tentamos reaplicar o journal e não deu (ou é cache do Windows) */
+    MOTIVO_RECUPERACAO_FALHOU  /* tentamos reaplicar o journal e não deu */
 } motivo_t;
+
+static const char *nome_do_motivo(motivo_t motivo)
+{
+    switch (motivo) {
+        case MOTIVO_HIBERNADO: return "hibernado";
+        case MOTIVO_CACHE_WINDOWS: return "cache-windows";
+        default: return "sujo";
+    }
+}
+
+/* Pela saída do driver que caiu para só leitura: "Windows is hibernated"/"Hibernated non-system partition"
+ * (hiberfil.sys) ou "Metadata kept in Windows cache" (journal 2.0, volume.c). O aviso de queda diz
+ * "hibernation", que não conta. */
+static motivo_t motivo_pela_saida(const char *saida, motivo_t sem_mensagem)
+{
+    if (strcasestr(saida, "hibernated")) return MOTIVO_HIBERNADO;
+    if (strcasestr(saida, "Windows cache")) return MOTIVO_CACHE_WINDOWS;
+    return sem_mensagem;
+}
 
 static void avisar_so_leitura(const char *ponto, motivo_t motivo)
 {
@@ -154,9 +174,16 @@ static void avisar_so_leitura(const char *ponto, motivo_t motivo)
                       "Ele foi montado só para leitura, para não perder dados. Para gravar: no Windows, desligue "
                       "a Inicialização rápida e use Desligar (não Hibernar).";
             break;
+        case MOTIVO_CACHE_WINDOWS:
+            formato = "O Windows foi desligado com a \"Inicialização rápida\" e deixou alterações do disco \"%s\" "
+                      "guardadas no cache dele.\n\n"
+                      "Ele foi montado só para leitura, para não perder dados. Para gravar: no Windows, use Reiniciar "
+                      "(não Desligar) para vir ao Mac, ou desligue a Inicialização rápida (Prompt de Comando como "
+                      "administrador: powercfg /h off) e use Desligar.";
+            break;
         case MOTIVO_RECUPERACAO_FALHOU:
             formato = "O disco \"%s\" não foi desconectado direito da última vez e não consegui recuperar as "
-                      "alterações pendentes do Windows (ou elas estão no cache da Inicialização rápida).\n\n"
+                      "alterações pendentes do Windows.\n\n"
                       "Ele foi montado só para leitura, para não piorar. Para gravar: conecte num Windows e rode "
                       "\"chkdsk /f\", ou ejete com segurança antes de tirar o cabo.";
             break;
@@ -185,6 +212,13 @@ static bool preparar_gravacao(const char *dispositivo, const preferencias_t *p, 
              s == SUJEIRA_HIBERNADO ? "hibernado" : s == SUJEIRA_JOURNAL ? "journal sujo" : "cache do Windows");
     if (s == SUJEIRA_HIBERNADO) {
         *motivo = MOTIVO_HIBERNADO;              /* nunca mexe no journal de um Windows hibernado */
+        return false;
+    }
+    if (s == SUJEIRA_CACHE_WINDOWS) {
+        /* O ntfsrecover recusa o 2.0 sem -k ("Fast restart mode detected"), e o -k jogaria fora o cache do
+         * Windows: nem tenta. O Tuxera reaplica e grava; aqui fica só leitura (decisão de 27/10/2026,
+         * docs/planos/CONFERENCIA_TUXERA_INICIALIZACAO_RAPIDA_2026-10-27.md). */
+        *motivo = MOTIVO_CACHE_WINDOWS;
         return false;
     }
     if (!p->recuperacao) {
@@ -276,11 +310,12 @@ int montar(int argc, char *argv[])
 
     if ((r == NTFS_HIBERNADO || r == NTFS_DESMONTAGEM_SUJA) && !so_leitura) {
         registro("montar %s: código %d, montando só para leitura", dispositivo, r);
+        motivo_t m = r == NTFS_HIBERNADO ? motivo_pela_saida(saida, MOTIVO_HIBERNADO) : MOTIVO_SUJO;
         montar_opcoes(opcoes, &p, &c, ponto, sistema, true);
         int r2 = rodar_driver(dispositivo, ponto, opcoes, saida, sizeof(saida));
         if (r2 == 0 && esperar_montado(ponto, ESPERA_MONTAGEM_SEGUNDOS)) {
-            gravar_motivo(dispositivo, r == NTFS_HIBERNADO ? "hibernado" : "sujo");
-            avisar_so_leitura(ponto, r == NTFS_HIBERNADO ? MOTIVO_HIBERNADO : MOTIVO_SUJO);
+            gravar_motivo(dispositivo, nome_do_motivo(m));
+            avisar_so_leitura(ponto, m);
             return 0;
         }
         r = r2;
@@ -297,19 +332,16 @@ int montar(int argc, char *argv[])
         return 1;
     }
     if (forcado_so_leitura) {
-        registro("montar %s em %s: montado só para leitura (%s)", dispositivo, ponto,
-                 motivo == MOTIVO_HIBERNADO ? "hibernado" : "disco sujo");
-        gravar_motivo(dispositivo, motivo == MOTIVO_HIBERNADO ? "hibernado" : "sujo");
+        registro("montar %s em %s: montado só para leitura (%s)", dispositivo, ponto, nome_do_motivo(motivo));
+        gravar_motivo(dispositivo, nome_do_motivo(motivo));
         avisar_so_leitura(ponto, motivo);
         return 0;
     }
     if (!so_leitura && caiu_para_so_leitura(ponto)) {
-        /* "Windows is hibernated" é a mensagem do hiberfil.sys; o aviso de queda diz "hibernation", outra coisa */
-        bool hibernado = strcasestr(saida, "hibernated") != NULL;
-        registro("montar %s em %s: o driver caiu para só leitura (%s)", dispositivo, ponto,
-                 hibernado ? "hibernado" : "desmontado sujo");
-        gravar_motivo(dispositivo, hibernado ? "hibernado" : "sujo");
-        avisar_so_leitura(ponto, hibernado ? MOTIVO_HIBERNADO : MOTIVO_SUJO);
+        motivo_t m = motivo_pela_saida(saida, MOTIVO_SUJO);
+        registro("montar %s em %s: o driver caiu para só leitura (%s)", dispositivo, ponto, nome_do_motivo(m));
+        gravar_motivo(dispositivo, nome_do_motivo(m));
+        avisar_so_leitura(ponto, m);
         return 0;
     }
     gravar_motivo(dispositivo, NULL);

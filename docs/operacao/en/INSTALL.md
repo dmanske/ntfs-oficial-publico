@@ -112,6 +112,7 @@ silicon, go back to **Full Security** in the Startup Security Utility).
 | What you see | What to do |
 |---|---|
 | The drive is read-only and the app says Windows is hibernated | In Windows, turn off "Fast Startup" and use Shut down (not Hibernate). |
+| The drive is read-only and the app says "Windows Fast Startup" | Windows was shut down with Fast Startup. Connect the drive to Windows and use Restart (not Shut down), or turn off Fast Startup (Command Prompt as administrator: `powercfg /h off`) and use Shut down. |
 | Nothing mounts and `kmutil showloaded` doesn't show `ntfsoficial` | Step 1 is missing (`csrutil status`), or the approval in Privacy & Security + restart. |
 | The app says another NTFS driver is installed | Uninstall the Tuxera/Paragon/macFUSE it points to. |
 | The `.pkg` "can't be opened" | Step 2. |

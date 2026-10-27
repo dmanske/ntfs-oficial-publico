@@ -8,6 +8,8 @@
 #   recuperavel  -> journal sujo mas íntegro (scripts/criar-journal-sujo.py): o ntfsrecover reaplica, o journal
 #                   fica limpo e o disco monta COM GRAVAÇÃO, sem a opção `recover` do driver
 #   controle     -> /.NTFS-Oficial/disable-driver: o disco fica para o NTFS só leitura da Apple
+# Também confere o motivo gravado para o app (/private/var/tmp/ntfsoficial/<disco>.motivo): "hibernado",
+# "cache-windows" (desde a 0.2.3; antes ia "sujo") ou "sujo"; sem arquivo = montou com gravação.
 # Cada disco é anexado como um HD plugado (o macOS decide quem monta) e depois ejetado.
 # Atenção: nos que montam só leitura aparece a janela de aviso na tela (clicar OK).
 # Precisa do pacote instalado (scripts/instalar.sh): a montagem passa pelo DiskArbitration.
@@ -55,8 +57,9 @@ com_volume "$P" "import sys,os; os.makedirs(os.path.join(sys.argv[1],'.NTFS-Ofic
 hdiutil detach -quiet "${P%s*}"
 
 FALHAS=0
-for caso in "hibernado:${NOME}:nao" "sujo:${NOME}:nao" "cache:${NOME}:nao" "recuperavel:${NOME}:sim" "controle:ntfs:nao"; do
-    IFS=: read -r nome tipo_esperado grava_esperado <<< "${caso}"
+for caso in "hibernado:${NOME}:nao:hibernado" "sujo:${NOME}:nao:sujo" "cache:${NOME}:nao:cache-windows" \
+            "recuperavel:${NOME}:sim:-" "controle:ntfs:nao:-"; do
+    IFS=: read -r nome tipo_esperado grava_esperado motivo_esperado <<< "${caso}"
     ROT="$(echo "TESTE ${nome}" | tr '[:lower:]' '[:upper:]')"; PONTO="/Volumes/${ROT}"
     INICIO="$(date '+%Y-%m-%d %H:%M:%S')"
     hdiutil attach "${T}/${nome}.dmg" > /dev/null 2>&1 || true
@@ -66,10 +69,12 @@ for caso in "hibernado:${NOME}:nao" "sujo:${NOME}:nao" "cache:${NOME}:nao" "recu
     if echo x > "${PONTO}/t.txt" 2>/dev/null; then GRAVA="gravou"; else GRAVA="não gravou"; fi
     AVISO="$(/usr/bin/log show --start "${INICIO}" --style compact --predicate "subsystem == \"${IDENTIFICADOR}\"" 2>/dev/null | grep -c 'caiu para só leitura\|montado só para leitura' || true)"
     REPLAY="$(/usr/bin/log show --start "${INICIO}" --style compact --predicate "subsystem == \"${IDENTIFICADOR}\"" 2>/dev/null | grep -c 'journal do Windows reaplicado' || true)"
-    esperado_grava="não gravou"; [ "${grava_esperado}" = "sim" ] && esperado_grava="gravou"
-    OK="ok"; { [ "${TIPO}" = "${tipo_esperado}" ] && [ "${GRAVA}" = "${esperado_grava}" ]; } || { OK="FALHOU"; FALHAS=$((FALHAS + 1)); }
-    echo "== ${nome}: montado por '${TIPO:-ninguém}' (esperado '${tipo_esperado}'), ${GRAVA} (esperado: ${esperado_grava}), aviso: ${AVISO}, replay do journal: ${REPLAY} -> ${OK}"
     DISCO="$(echo "${LINHA}" | awk '{print $1}')"
+    MOTIVO="-"; [ -n "${DISCO}" ] && [ -f "/private/var/tmp/${NOME}/${DISCO##*/}.motivo" ] && MOTIVO="$(cat "/private/var/tmp/${NOME}/${DISCO##*/}.motivo")"
+    [ "${tipo_esperado}" = "ntfs" ] && MOTIVO="-"   # montado pela Apple: o nosso util nem rodou
+    esperado_grava="não gravou"; [ "${grava_esperado}" = "sim" ] && esperado_grava="gravou"
+    OK="ok"; { [ "${TIPO}" = "${tipo_esperado}" ] && [ "${GRAVA}" = "${esperado_grava}" ] && [ "${MOTIVO}" = "${motivo_esperado}" ]; } || { OK="FALHOU"; FALHAS=$((FALHAS + 1)); }
+    echo "== ${nome}: montado por '${TIPO:-ninguém}' (esperado '${tipo_esperado}'), ${GRAVA} (esperado: ${esperado_grava}), motivo: ${MOTIVO} (esperado: ${motivo_esperado}), aviso: ${AVISO}, replay do journal: ${REPLAY} -> ${OK}"
     [ -n "${DISCO}" ] && { diskutil eject "${DISCO%s*}" > /dev/null 2>&1 || hdiutil detach -quiet "${PONTO}" || true; }
     sleep 2
 done

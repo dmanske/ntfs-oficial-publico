@@ -48,9 +48,14 @@ confirmadas no `$LogFile` que não chegaram aos metadados. O Tuxera reaplica ess
 | 0, mas com a marca do chkdsk (`VOLUME_IS_DIRTY`) e journal limpo | o Windows marcou o disco para conferir | monta com gravação, como o Tuxera; a marca fica até um chkdsk no Windows |
 | 15 | journal sujo | `ntfsrecover` (replay; termina gravando o journal como limpo, versão 1.1) → probe tem que dar 0 → monta com gravação |
 | 14, mensagem "hibernated" | Windows hibernado (`hiberfil.sys`) | só leitura; nunca mexe no journal |
-| 14, sem "hibernated" | journal 2.0, "Metadata kept in Windows cache" (inicialização rápida, ou disco arrancado do Windows 8+) | tenta o `ntfsrecover`, que recusa ("Fast restart mode detected") sem `-k`; fica só leitura. O `-k` jogaria fora o cache do Windows e não é usado |
-| replay falha, ou `EnableAutomaticRecovery = 0` | — | só leitura + aviso (motivo gravado para o app) |
+| 14, sem "hibernated" | journal 2.0, "Metadata kept in Windows cache" (Inicialização Rápida, ou disco arrancado do Windows 8+) | **não roda o `ntfsrecover`** (desde a 0.2.3; ele recusa sem `-k` e o `-k` jogaria fora o cache do Windows); monta só leitura, grava o motivo `cache-windows` e avisa: use Reiniciar (não Desligar) no Windows, ou `powercfg /h off` e Desligar. O Tuxera reaplica e grava; aqui é decisão diferente ([conferência de 27/10/2026](../planos/CONFERENCIA_TUXERA_INICIALIZACAO_RAPIDA_2026-10-27.md)) |
+| replay falha, ou `EnableAutomaticRecovery = 0` | — | só leitura + aviso (motivo `sujo` gravado para o app) |
 
+- **Arquivo de motivo** (`/private/var/tmp/ntfsoficial/<disco>.motivo`, lido pelo app): `hibernado`, `cache-windows` ou
+  `sujo`; sem arquivo = montou com gravação. Se o driver cai para só leitura sozinho (ou sai com 14), a saída
+  "Metadata kept in Windows cache" também vira `cache-windows` (`motivo_pela_saida` em `montar.c`). Até a 0.2.2 o
+  caso do journal 2.0 gravava `sujo` e o app mostrava "desconectado sem ejetar"
+  ([correção](../correcoes/2026-10-27_inicializacao-rapida-texto-errado.md)).
 - A marca `VOLUME_IS_DIRTY` (19/10/2026, decisão do Daniel): a libntfs-3g ignora de propósito (`ntfsprogs/utils.c:271-278`),
   e o Tuxera também monta com gravação e não mexe na marca ao montar. O **Reparar não tira a marca** (decisão de 18/10/2026):
   o Tuxera só tira depois do `ntfsck` completo dele, que não temos; e o `ntfsfix -d` também apagaria as flags

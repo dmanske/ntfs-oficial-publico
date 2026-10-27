@@ -86,6 +86,7 @@ sozinho depois de reiniciar. Para usar a opção B, precisa de um ajuste (ex.: o
 | Disco ficou só leitura pela Apple | falta permitir o kext em Privacidade e Segurança + reiniciar; o registro mostra `kext não carregou (load_ntfsoficial = 1)` |
 | Reinicia sozinho quando outro Mac abre um disco NTFS dele pela rede (o relatório diz `What kind of a flag is this` e `smbd`) | até a 0.2.1 (kext 0.1.1); corrigido na 0.2.2 (kext 0.1.2). Enquanto estiver na 0.2.1, tire os discos NTFS das pastas compartilhadas (Ajustes → Geral → Compartilhamento → Compartilhamento de Arquivos) |
 | Tudo que usa um disco NTFS para de responder (Finder, FinderX, Spotlight, o app NTFS Oficial) e só volta reiniciando | até a 0.2.1: um programa foi encerrado enquanto esperava o disco e o kext entrou num laço. Corrigido na 0.2.2 (kext 0.1.2). Na 0.2.1, reinicie |
+| Depois de usar Desligar no Windows, os discos NTFS ficam só leitura e o app diz "Inicialização rápida do Windows" (até a 0.2.2 dizia, errado, "desconectado sem ejetar") | É a Inicialização rápida do Windows: o Desligar não fecha os discos de vez. Para vir ao macOS, use **Reiniciar** no Windows (não Desligar) e escolha o macOS no OpenCore. Para não acontecer mais: Prompt de Comando como administrador → `powercfg /h off`. Reiniciar o Mac não resolve |
 
 ## Compilar no Hackintosh (Intel)
 

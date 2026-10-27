@@ -16,9 +16,20 @@ enum Formatacao {
     static func motivo(_ m: MotivoSoLeitura?) -> String? {
         switch m {
         case .hibernado: return Texto.t(.motivoHibernado)
+        case .cacheWindows: return Texto.t(.motivoCacheWindows)
         case .sujo: return Texto.t(.motivoSujo)
         case .outroDriver: return Texto.t(.motivoOutroDriver)
         case nil: return nil
+        }
+    }
+
+    /// O que fazer para gravar (os mesmos textos do Verificar); nil quando não há o que explicar.
+    static func explicacao(_ m: MotivoSoLeitura?) -> String? {
+        switch m {
+        case .hibernado: return Texto.t(.verHibernado)
+        case .cacheWindows: return Texto.t(.verCacheWindows)
+        case .sujo: return Texto.t(.verSujo)
+        case .outroDriver, nil: return nil
         }
     }
 

@@ -115,6 +115,7 @@ Para religar a proteção do sistema depois: modo de recuperação → Terminal 
 | O que aparece | O que fazer |
 |---|---|
 | Disco aparece só para leitura e o app avisa "Windows hibernado" | No Windows, desligue a "Inicialização rápida" e use Desligar (não Hibernar). |
+| Disco aparece só para leitura e o app avisa "Inicialização rápida do Windows" | O Windows foi desligado com a Inicialização rápida. Ligue o disco no Windows e use Reiniciar (não Desligar), ou desligue a Inicialização rápida (Prompt de Comando como administrador: `powercfg /h off`) e use Desligar. |
 | Nada monta e `kmutil showloaded` não mostra `ntfsoficial` | Faltou o passo 1 (`csrutil status`) ou a aprovação em Privacidade e Segurança + reinício. |
 | O app avisa "Outro driver NTFS instalado" | Desinstale o Tuxera/Paragon/macFUSE indicado. |
 | `.pkg` "não pode ser aberto" | Passo 2. |

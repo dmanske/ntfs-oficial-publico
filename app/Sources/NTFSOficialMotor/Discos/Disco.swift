@@ -3,6 +3,8 @@ import DiskArbitration
 
 public enum MotivoSoLeitura: String, Equatable, Sendable {
     case hibernado
+    /// Journal 2.0: o Windows foi desligado com a Inicialização rápida (ou o disco foi arrancado de um Windows 8+).
+    case cacheWindows = "cache-windows"
     case sujo
     /// Montado só para leitura pelo NTFS da Apple (o NTFS Oficial não montou).
     case outroDriver
@@ -47,12 +49,13 @@ public struct Disco: Identifiable, Equatable, Sendable {
         return false
     }
 
-    /// Lê `<pasta>/<bsd>.motivo` ("hibernado" ou "sujo"). Sem arquivo (ou conteúdo estranho) = nil.
+    /// Lê `<pasta>/<bsd>.motivo` ("hibernado", "cache-windows" ou "sujo"). Sem arquivo (ou conteúdo estranho) = nil.
     public static func lerMotivo(bsdName: String, pasta: String = CaminhosDriver.pastaMotivos) -> MotivoSoLeitura? {
         let caminho = (pasta as NSString).appendingPathComponent(bsdName + ".motivo")
         guard let texto = try? String(contentsOfFile: caminho, encoding: .utf8) else { return nil }
         switch texto.trimmingCharacters(in: .whitespacesAndNewlines) {
         case "hibernado": return .hibernado
+        case "cache-windows": return .cacheWindows
         case "sujo": return .sujo
         default: return nil
         }

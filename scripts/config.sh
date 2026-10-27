@@ -7,7 +7,7 @@ NOME="ntfsoficial"
 NOME_EXIBICAO="NTFSOficial"
 # Prefixo dos identificadores (kext: ${IDENTIFICADOR}.filesystems.${NOME})
 IDENTIFICADOR="com.danielmanske.ntfsoficial"
-VERSAO="0.2.2"
+VERSAO="0.2.3"
 # Versão do kext: vai para o kext (sysctl version.number) e para o load_/mount_ntfsoficial, que recusam montar se
 # ela for diferente da do kext carregado ("mismatched version"). Só mude quando o código do kext mudar: kext novo
 # exige aprovar em Ajustes e reiniciar, e o instalar.sh mantém o kext já aprovado. Separada da VERSAO desde

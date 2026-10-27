@@ -6,7 +6,7 @@ enum Chave {
     case menuTitulo, menuNenhum, menuLivres, menuAbrirFinder, menuEjetar, menuSoLeitura, menuNaoMontado
     case menuMontar, menuGerenciador, menuPreferencias, menuSair
     // Motivos
-    case motivoHibernado, motivoSujo, motivoOutroDriver
+    case motivoHibernado, motivoCacheWindows, motivoSujo, motivoOutroDriver
     // Janela
     case janelaTitulo, listaGravacao, listaSoLeitura, listaNaoMontado, semDiscos
     case detNaoMontado, seloGravacao, seloSoLeitura, seloSoLeituraMotivo, usados, livres
@@ -82,6 +82,7 @@ enum Texto {
         case .menuPreferencias: return "Preferências…"
         case .menuSair: return "Sair do NTFS Oficial"
         case .motivoHibernado: return "Windows hibernado"
+        case .motivoCacheWindows: return "Inicialização rápida do Windows"
         case .motivoSujo: return "desconectado sem ejetar"
         case .motivoOutroDriver: return "outro driver / NTFS Oficial desligado"
         case .janelaTitulo: return "Gerenciador de discos"
@@ -132,7 +133,7 @@ enum Texto {
         case .verificarTitulo: return "Verificação de “%@”"
         case .verLimpo: return "O disco está limpo e pode ser montado com gravação."
         case .verHibernado: return "O disco está hibernado pelo Windows (ou com a Inicialização rápida ligada). Ele só monta para leitura. Para gravar: no Windows, desligue a Inicialização rápida e use Desligar (não Hibernar)."
-        case .verCacheWindows: return "O Windows deixou alterações no cache da Inicialização rápida (journal versão 2.0). O disco só monta para leitura, porque reaplicá-las perderia dados. Para gravar: conecte no Windows, desligue a Inicialização rápida e use Desligar (não Hibernar)."
+        case .verCacheWindows: return "O Windows foi desligado com a Inicialização rápida e deixou alterações deste disco no cache dele (journal versão 2.0). O disco só monta para leitura, porque gravar agora pode perder dados. Para gravar: no Windows, use Reiniciar (não Desligar) para vir ao Mac, ou desligue a Inicialização rápida (powercfg /h off) e use Desligar."
         case .verSujo: return "O disco não foi desconectado direito (journal do Windows pendente). Use Reparar: o NTFS Oficial reaplica as alterações que o Windows já tinha confirmado. Se não for possível, rode “chkdsk /f” no Windows."
         case .verEstrutura: return "O journal está em ordem, mas o ntfsfix -n encontrou problemas na estrutura do disco (boot, $MFT ou $MFTMirr). Veja os detalhes abaixo; Reparar tenta corrigir."
         case .verErro: return "A verificação terminou com o código %d. Veja os detalhes abaixo."
@@ -236,6 +237,7 @@ enum Texto {
         case .menuPreferencias: return "Preferences…"
         case .menuSair: return "Quit NTFS Oficial"
         case .motivoHibernado: return "Windows hibernated"
+        case .motivoCacheWindows: return "Windows Fast Startup"
         case .motivoSujo: return "unplugged without ejecting"
         case .motivoOutroDriver: return "other driver / NTFS Oficial turned off"
         case .janelaTitulo: return "Disk Manager"
@@ -286,7 +288,7 @@ enum Texto {
         case .verificarTitulo: return "Verification of “%@”"
         case .verLimpo: return "The disk is clean and can be mounted read/write."
         case .verHibernado: return "The disk is hibernated by Windows (or Fast Startup is on). It only mounts read-only. To write: in Windows, turn off Fast Startup and use Shut down (not Hibernate)."
-        case .verCacheWindows: return "Windows left changes in the Fast Startup cache (journal version 2.0). The disk only mounts read-only, because replaying them would lose data. To write: connect it to Windows, turn off Fast Startup and use Shut down (not Hibernate)."
+        case .verCacheWindows: return "Windows was shut down with Fast Startup and kept changes to this disk in its cache (journal version 2.0). The disk only mounts read-only, because writing now could lose data. To write: in Windows, use Restart (not Shut down) to come to the Mac, or turn off Fast Startup (powercfg /h off) and use Shut down."
         case .verSujo: return "The disk was not unplugged properly (pending Windows journal). Use Repair: NTFS Oficial replays the changes Windows had already committed. If that is not possible, run “chkdsk /f” in Windows."
         case .verEstrutura: return "The journal is fine, but ntfsfix -n found problems in the disk structure (boot sector, $MFT or $MFTMirr). See the details below; Repair tries to fix them."
         case .verErro: return "The verification ended with code %d. See the details below."

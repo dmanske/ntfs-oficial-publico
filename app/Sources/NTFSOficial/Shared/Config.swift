@@ -2,7 +2,8 @@ import Foundation
 
 /// Valores ajustáveis do app, num lugar só.
 enum Config {
-    static let versao = "0.1.1"
+    /// Do Info.plist que o scripts/montar-app.sh grava com a VERSAO do scripts/config.sh; pelo `swift run` não há.
+    static let versao = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
     /// Motivo registrado no macOS ao desligar o encerramento automático (app de barra de menus).
     static let motivoSemEncerramento = "NTFS Oficial fica na barra de menus"
     static let identificador = "com.danielmanske.ntfsoficial.app"

@@ -116,6 +116,7 @@ reiniciar (y, en chip de Apple, volver a **Seguridad completa** en la Utilidad S
 | Lo que aparece | Qué hacer |
 |---|---|
 | El disco aparece solo de lectura y la app avisa que Windows está hibernado | En Windows, desactiva el "Inicio rápido" y usa Apagar (no Hibernar). |
+| El disco aparece solo de lectura y la app avisa "Windows Fast Startup" | Windows se apagó con el Inicio rápido. Conecta el disco a Windows y usa Reiniciar (no Apagar), o desactiva el Inicio rápido (Símbolo del sistema como administrador: `powercfg /h off`) y usa Apagar. |
 | No se monta nada y `kmutil showloaded` no muestra `ntfsoficial` | Falta el paso 1 (`csrutil status`) o la aprobación en Privacidad y seguridad + reinicio. |
 | La app avisa que hay otro controlador NTFS instalado | Desinstala el Tuxera/Paragon/macFUSE que indica. |
 | El `.pkg` "no se puede abrir" | Paso 2. |
